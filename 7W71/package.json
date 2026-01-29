@@ -1,0 +1,38 @@
+{
+  "name": "blackeker",
+  "version": "2.0.0",
+  "description": "Blackeker Discord Bot Application",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "author": "Blackeker",
+  "dependencies": {
+    "debug": "^4.3.4",
+
+    "discord.js-selfbot-v13": "^3.7.1"
+  },
+  "devDependencies": {
+    "electron": "^38.3.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.blackeker.app",
+    "productName": "Blackeker",
+    "files": [
+      "**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BLACKEKER CONTROL PANEL</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --panel: #13131f;
+            --border: #2a2a35;
+            --primary: #bb86fc;
+            --secondary: #03dac6;
+            --danger: #cf6679;
+            --text: #e0e0e0;
+            --neon-green: #0f0;
+            --neon-purple: #b026ff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Share Tech Mono', monospace;
+            background-color: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* SCROLLBAR */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: 250px;
+            background-color: var(--panel);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
+            z-index: 10;
+        }
+
+        .brand {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 24px;
+            font-weight: 900;
+            color: var(--secondary);
+            text-shadow: 0 0 10px var(--secondary);
+            margin-bottom: 40px;
+            text-align: center;
+            letter-spacing: 2px;
+        }
+
+        .nav-item {
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+            font-size: 18px;
+            color: #888;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            background: rgba(187, 134, 252, 0.1);
+            border-left: 3px solid var(--primary);
+            color: var(--primary);
+            padding-left: 20px;
+            text-shadow: 0 0 5px var(--primary);
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+            font-size: 12px;
+            color: #555;
+            text-align: center;
+        }
+
+        /* MAIN CONTENT */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* HEADER */
+        .header {
+            height: 60px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 30px;
+            background: rgba(19, 19, 31, 0.95);
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            padding: 5px 15px;
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #555;
+            margin-right: 10px;
+            box-shadow: 0 0 5px #555;
+            transition: all 0.5s;
+        }
+
+        .dot.online {
+            background: #0f0;
+            box-shadow: 0 0 10px #0f0;
+        }
+
+        .dot.offline {
+            background: #f00;
+            box-shadow: 0 0 10px #f00;
+        }
+
+        .dot.locked {
+            background: #ff00ff;
+            box-shadow: 0 0 15px #ff00ff;
+            animation: blink 0.5s infinite;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        /* VIEWS */
+        .view {
+            display: none;
+            padding: 30px;
+            overflow-y: auto;
+            height: calc(100vh - 60px);
+            animation: fadeIn 0.3s;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* CARDS & FORMS */
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            padding: 25px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--primary);
+        }
+
+        h2 {
+            margin-top: 0;
+            color: var(--secondary);
+            font-family: 'Orbitron';
+            font-size: 20px;
+            margin-bottom: 20px;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            background: #0a0a0f;
+            border: 1px solid #333;
+            color: var(--text);
+            padding: 12px;
+            margin-bottom: 15px;
+            font-family: 'Share Tech Mono';
+            font-size: 14px;
+        }
+
+        input:focus {
+            outline: 1px solid var(--secondary);
+            box-shadow: 0 0 5px var(--secondary);
+        }
+
+        button {
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 10px 25px;
+            font-family: 'Orbitron';
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 1px;
+        }
+
+        button:hover {
+            background: var(--primary);
+            color: #000;
+            box-shadow: 0 0 15px var(--primary);
+        }
+
+        button.danger {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        button.danger:hover {
+            background: var(--danger);
+            color: #fff;
+            box-shadow: 0 0 15px var(--danger);
+        }
+
+        button.success {
+            border-color: var(--secondary);
+            color: var(--secondary);
+        }
+
+        button.success:hover {
+            background: var(--secondary);
+            color: #000;
+            box-shadow: 0 0 15px var(--secondary);
+        }
+
+        /* CAPTCHA OVERLAY */
+        #captcha-overlay {
+            display: none;
+            background: rgba(255, 0, 0, 0.1);
+            border: 2px solid var(--danger);
+            text-align: center;
+            padding: 40px;
+        }
+
+        #captcha-img {
+            max-width: 100%;
+            border: 1px solid #fff;
+            margin: 20px 0;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+        }
+
+        /* COMMAND LIST */
+        .cmd-item {
+            background: #000;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 2px solid #333;
+        }
+
+        .cmd-item:hover {
+            border-left-color: var(--secondary);
+        }
+
+        .cmd-trigger {
+            color: var(--secondary);
+            font-weight: bold;
+        }
+
+        .cmd-response {
+            color: #888;
+            font-size: 12px;
+            margin-left: 15px;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* LOGS */
+        #logs {
+            background: #000;
+            height: 200px;
+            overflow-y: scroll;
+            padding: 10px;
+            font-size: 12px;
+            border-top: 1px solid var(--border);
+            color: #0f0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <div class="brand">BLACKEKER</div>
+        <div class="nav-item active" onclick="showView('dashboard')">DASHBOARD</div>
+        <div class="nav-item" onclick="showView('commands')">AUTO-MESSAGES</div>
+        <div class="nav-item" onclick="showView('settings')">SETTINGS</div>
+        <div class="nav-item" onclick="showView('auth')">ACCOUNT</div>
+
+        <div class="sidebar-footer">
+            v2.1.0 • SYSTEM ACTIVE
+        </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="main">
+        <!-- HEADER -->
+        <div class="header">
+            <div id="page-title" style="font-family: Orbitron; font-size: 18px; color: #fff;">DASHBOARD</div>
+            <div class="status-badge">
+                <div id="statusDot" class="dot"></div>
+                <span id="statusText">CONNECTING...</span>
+            </div>
+        </div>
+
+        <!-- VIEW: AUTH -->
+        <div id="auth" class="view">
+            <div class="card" style="max-width: 500px; margin: 0 auto;">
+                <h2>SECURE LOGIN</h2>
+                <p style="color: #666; margin-bottom: 20px;">Enter your Discord Token to register or existing API Key.
+                </p>
+
+                <div id="register-form">
+                    <label>DISCORD TOKEN</label>
+                    <input type="password" id="discordToken" placeholder="MTA...">
+                    <button class="success" onclick="registerUser()" style="width: 100%">REGISTER & GET KEY</button>
+                </div>
+
+                <div style="margin: 30px 0; border-top: 1px solid #333; position: relative; text-align: center;">
+                    <span
+                        style="background: var(--panel); padding: 0 10px; position: relative; top: -10px; color: #555;">OR</span>
+                </div>
+
+                <div id="login-form">
+                    <label>EXISTING API KEY</label>
+                    <input type="text" id="apiKey" placeholder="uuid...">
+                    <button onclick="saveApiKey()" style="width: 100%">LOGIN WITH KEY</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: DASHBOARD -->
+        <div id="dashboard" class="view active">
+            <!-- CAPTCHA ALERT -->
+            <div id="captcha-overlay" class="card">
+                <h1 style="color: var(--danger); font-family: Orbitron; margin: 0;">⚠️ SYSTEM LOCKED</h1>
+                <p>CAPTCHA DETECTION TRIGGERED. MANUAL INTERVENTION REQUIRED.</p>
+                <img id="captcha-img" src="" alt="WAITING FOR IMAGE..." />
+                <p style="font-size: 18px;">TYPE IN DISCORD: <code
+                        style="color: var(--secondary);">+captcha [code]</code></p>
+            </div>
+
+            <div style="display: flex; gap: 20px;">
+                <div class="card" style="flex: 1;">
+                    <h2>BOT CONTROL</h2>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="success" onclick="startBot()">INITIATE SEQUENCE</button>
+                        <button class="danger" onclick="stopBot()">TERMINATE PROCESS</button>
+                    </div>
+                    <p id="bot-info" style="margin-top: 15px; color: #666;">Waiting for data...</p>
+                </div>
+
+                <div class="card" style="flex: 1;">
+                    <h2>QUICK MESSAGE</h2>
+                    <input type="text" id="qk-channel" placeholder="Channel ID">
+                    <input type="text" id="qk-msg" placeholder="Message Content">
+                    <button onclick="sendMessage()">TRANSMIT</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: COMMANDS -->
+        <div id="commands" class="view">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>MESSAGE AUTOMATION</h2>
+                    <button class="success" onclick="showAddCommandUI()">+ NEW TASK</button>
+                </div>
+
+                <div id="add-cmd-ui"
+                    style="display:none; background: #000; padding: 15px; margin-bottom: 20px; border: 1px solid #333;">
+                    <input type="text" id="new-cmd-trigger" placeholder="Task Name (e.g. Advert 1)">
+                    <input type="text" id="new-cmd-response" placeholder="Message Content">
+                    <input type="text" id="new-cmd-response" placeholder="Response Text">
+                    <input type="number" id="new-cmd-interval" placeholder="Auto-Msg Interval (ms) - Optional">
+                    <button onclick="addCommand()">SAVE TO DB</button>
+                    <button class="danger"
+                        onclick="document.getElementById('add-cmd-ui').style.display='none'">CANCEL</button>
+                </div>
+
+                <div id="command-list">
+                    <!-- Loaded via JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: SETTINGS -->
+        <div id="settings" class="view">
+            <div class="card" style="max-width: 600px;">
+                <h2>SYSTEM CONFIGURATION</h2>
+
+                <label>DEFAULT CHANNEL ID</label>
+                <input type="text" id="st-channel">
+
+                <label>THEME PRESET</label>
+                <select id="st-theme">
+                    <option value="dark">DARK (DEFAULT)</option>
+                    <option value="cyberpunk">CYBERPUNK</option>
+                    <option value="light">LIGHT (NOT RECOMMENDED)</option>
+                </select>
+
+                <button class="success" onclick="saveSettings()">UPDATE CONFIGURATION</button>
+            </div>
+            <button class="success" onclick="saveSettings()">UPDATE CONFIGURATION</button>
+        </div>
+
+        <!-- RIC PRESENCE SETTINGS -->
+        <div class="card" style="max-width: 600px;">
+            <h2>RICH PRESENCE (RPC)</h2>
+
+            <div class="form-group">
+                <label>ENABLE RPC</label>
+                <input type="checkbox" id="rpc-enabled" style="width: auto;">
+            </div>
+
+            <label>ACTIVITY TYPE</label>
+            <select id="rpc-type">
+                <option value="PLAYING">PLAYING</option>
+                <option value="STREAMING">STREAMING</option>
+                <option value="LISTENING">LISTENING</option>
+                <option value="WATCHING">WATCHING</option>
+                <option value="COMPETING">COMPETING</option>
+            </select>
+
+            <label>NAME (e.g. Visual Studio Code)</label>
+            <input type="text" id="rpc-name" placeholder="Activity Name">
+
+            <label>DETAILS (e.g. Coding)</label>
+            <input type="text" id="rpc-details" placeholder="Details">
+
+            <label>STATE (e.g. Debugging)</label>
+            <input type="text" id="rpc-state" placeholder="State">
+
+            <label>LARGE IMAGE KEY/URL</label>
+            <input type="text" id="rpc-large-image" placeholder="Image Key or URL">
+
+            <button onclick="saveRpcSettings()">UPDATE PRESENCE</button>
+        </div>
+    </div>
+
+    <!-- LOGS FOOTER -->
+    <div id="logs">
+        [SYSTEM INITIALIZED] Ready.
+    </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3000/api';
+        let apiKey = localStorage.getItem('blackeker_api_key') || '';
+
+        // INIT
+        if (apiKey) {
+            document.getElementById('apiKey').value = apiKey;
+            startStatusLoop();
+        } else {
+            showView('auth');
+        }
+
+        // NAVIGATION
+        function showView(id) {
+            document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+            document.getElementById(id).classList.add('active');
+            // Simple nav highlight logic
+            const navs = ['dashboard', 'commands', 'settings', 'auth'];
+            document.querySelectorAll('.nav-item')[navs.indexOf(id)]?.classList.add('active');
+
+            document.getElementById('page-title').innerText = id.toUpperCase();
+
+            if (id === 'commands') loadCommands();
+            if (id === 'settings') loadSettings();
+        }
+
+        // LOGGING
+        function log(msg) {
+            const el = document.getElementById('logs');
+            const div = document.createElement('div');
+            div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            el.insertBefore(div, el.firstChild);
+        }
+
+        // AUTH
+        async function registerUser() {
+            const token = document.getElementById('discordToken').value;
+            if (!token) return alert('Enter Token');
+
+            try {
+                const res = await fetch(`${API_URL}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    apiKey = data.apiKey;
+                    if (data.data.rpcSettings) {
+                        const rpc = data.data.rpcSettings;
+                        document.getElementById('rpc-enabled').checked = !!data.data.rpcEnabled;
+                        document.getElementById('rpc-type').value = rpc.type || 'PLAYING';
+                        document.getElementById('rpc-name').value = rpc.name || '';
+                        document.getElementById('rpc-details').value = rpc.details || '';
+                        document.getElementById('rpc-state').value = rpc.state || '';
+                        document.getElementById('rpc-large-image').value = rpc.largeImageKey || '';
+                        document.getElementById('rpc-state').value = rpc.state || '';
+                        document.getElementById('rpc-large-image').value = rpc.largeImageKey || '';
+                    }
+                    localStorage.setItem('blackeker_api_key', apiKey);
+                    document.getElementById('apiKey').value = apiKey; // Populate input
+                    alert(`✅ REGISTRATION SUCCESSFUL!\n\nYOUR API KEY:\n${apiKey}\n\n(It has been saved to your browser cache)`);
+                    showView('dashboard');
+                    startStatusLoop();
+                } else {
+                    alert('ERROR: ' + data.error);
+                }
+            } catch (e) { alert(e.message); }
+        }
+
+        function saveApiKey() {
+            apiKey = document.getElementById('apiKey').value;
+            localStorage.setItem('blackeker_api_key', apiKey);
+            showView('dashboard');
+            startStatusLoop();
+        }
+
+        // API WRAPPER
+        async function api(endpoint, method = 'GET', body = null) {
+            if (!apiKey) return null;
+            try {
+                const flow = { method, headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey } };
+                if (body) flow.body = JSON.stringify(body);
+
+                const res = await fetch(`${API_URL}${endpoint}`, flow);
+                const data = await res.json();
+
+                if (res.status === 423) {
+                    handleLock(true, data); // Locked
+                } else if (res.status === 401) {
+                    log('UNAUTHORIZED. CHECK KEY.');
+                }
+
+                return { status: res.status, data };
+            } catch (e) {
+                log('NET ERR: ' + e.message);
+                return null;
+            }
+        }
+
+        // CORE LOGIC
+        let statusInterval;
+        function startStatusLoop() {
+            if (statusInterval) clearInterval(statusInterval);
+            checkStatus();
+            statusInterval = setInterval(checkStatus, 5000);
+        }
+
+        async function checkStatus() {
+            const res = await api('/bot/status');
+            const dot = document.getElementById('statusDot');
+            const txt = document.getElementById('statusText');
+
+            if (res && res.data.success) {
+                const d = res.data.data;
+                const cap = res.data.captchaState;
+
+                document.getElementById('bot-info').innerText = `USER: ${d.username} | ID: ${d.id}`;
+
+                if (cap && cap.active) {
+                    handleLock(true, cap);
+                } else {
+                    handleLock(false);
+                    if (d.isReady) {
+                        dot.className = 'dot online';
+                        txt.innerText = 'ONLINE';
+                        txt.style.color = '#0f0';
+                    } else {
+                        dot.className = 'dot';
+                        txt.innerText = 'CONNECTED';
+                        txt.style.color = '#aaa';
+                    }
+                }
+            } else {
+                dot.className = 'dot offline';
+                txt.innerText = 'OFFLINE';
+                txt.style.color = '#f00';
+            }
+        }
+
+        function handleLock(locked, data) {
+            const overlay = document.getElementById('captcha-overlay');
+            const dot = document.getElementById('statusDot');
+            const txt = document.getElementById('statusText');
+
+            if (locked) {
+                overlay.style.display = 'block';
+                dot.className = 'dot locked';
+                txt.innerText = 'LOCKED';
+                txt.style.color = '#ff00ff';
+                if (data && data.imageBase64) {
+                    document.getElementById('captcha-img').src = `data:image/png;base64,${data.imageBase64}`;
+                }
+            } else {
+                overlay.style.display = 'none';
+            }
+        }
+
+        async function startBot() {
+            log('Starting...');
+            await api('/bot/start', 'POST');
+            setTimeout(checkStatus, 2000);
+        }
+
+        async function stopBot() {
+            log('Stopping...');
+            await api('/bot/stop', 'POST');
+            setTimeout(checkStatus, 1000);
+        }
+
+        async function sendMessage() {
+            const channelId = document.getElementById('qk-channel').value;
+            const message = document.getElementById('qk-msg').value;
+            const res = await api('/bot/send-message', 'POST', { channelId, message });
+            if (res) log(res.data.success ? 'SENT' : 'FAIL: ' + res.data.error);
+        }
+
+        // COMMANDS
+        async function loadCommands() {
+            log('Loading commands...');
+            const res = await api('/bot/commands');
+            const list = document.getElementById('command-list');
+            list.innerHTML = '';
+            if (res && res.data.success) {
+                res.data.data.forEach((cmd, idx) => {
+                    list.innerHTML += `
+                    <div class="cmd-item">
+                        <div class="cmd-trigger">${cmd.trigger}</div>
+                        <div class="cmd-response">
+                            ${cmd.text}
+                            ${cmd.interval ? `<span style="color:var(--neon-green); font-size:10px; margin-left:5px;">(Every ${cmd.interval}ms)</span>` : ''}
+                        </div>
+                        <button class="danger" onclick="delCommand(${idx})">DEL</button>
+                    </div>
+                `;
+                });
+            }
+        }
+
+        function showAddCommandUI() {
+            document.getElementById('add-cmd-ui').style.display = 'block';
+        }
+
+        async function addCommand() {
+            const trig = document.getElementById('new-cmd-trigger').value;
+            const resp = document.getElementById('new-cmd-response').value;
+            const intv = document.getElementById('new-cmd-interval').value;
+            await api('/bot/commands/add', 'POST', { command: { trigger: trig, text: resp, interval: intv ? parseInt(intv) : 0 } });
+            document.getElementById('add-cmd-ui').style.display = 'none';
+            loadCommands();
+        }
+
+        async function delCommand(idx) {
+            if (confirm('Delete?')) {
+                await api(`/bot/commands/${idx}`, 'DELETE');
+                loadCommands();
+            }
+        }
+
+        // SETTINGS
+        async function loadSettings() {
+            const res = await api('/bot/settings', 'GET'); // Assuming we can GET settings, logic implies POST updates mainly but let's assume POST allows reading or we need GET implementation
+            // The API actually only has POST /settings to update and return new settings.
+            // We might want to use POST with empty body to get settings or assume defaults.
+            // For now, let's just implement Save.
+            // Actually the endpoint logic is: saves settings then returns current settings.
+            // So to GET, we can send empty body?
+            // Checking botRoutes.js: It updates if fields are present. If we send empty body it basically does nothing and returns current.
+            const r = await api('/bot/settings', 'POST', {});
+            if (r && r.data.success) {
+                const s = r.data.data;
+                document.getElementById('st-channel').value = s.channelId || '';
+                document.getElementById('st-theme').value = s.theme || 'dark';
+                document.getElementById('st-theme').value = s.theme || 'dark';
+            }
+
+            // Ayarlar yüklendikten sonra RPC endpoint'inden detayları da alabiliriz veya saveSettings içinde merge edebiliriz
+            // Şimdilik RPC formunu yukarıdaki genel settings response içinden dolduralım
+            const rpc = r && r.data.data.rpcSettings;
+            if (rpc) {
+                document.getElementById('rpc-enabled').checked = !!r.data.data.rpcEnabled;
+                document.getElementById('rpc-type').value = rpc.type || 'PLAYING';
+                document.getElementById('rpc-name').value = rpc.name || '';
+                document.getElementById('rpc-details').value = rpc.details || '';
+                document.getElementById('rpc-state').value = rpc.state || '';
+                document.getElementById('rpc-large-image').value = rpc.largeImageKey || '';
+            }
+        }
+
+        async function saveSettings() {
+            const body = {
+                channelId: document.getElementById('st-channel').value,
+                theme: document.getElementById('st-theme').value
+            };
+            await api('/bot/settings', 'POST', body);
+            log('Settings saved.');
+        }
+
+        async function saveRpcSettings() {
+            const enabled = document.getElementById('rpc-enabled').checked;
+            const type = document.getElementById('rpc-type').value;
+            const name = document.getElementById('rpc-name').value;
+            const details = document.getElementById('rpc-details').value;
+            const state = document.getElementById('rpc-state').value;
+            const largeImageKey = document.getElementById('rpc-large-image').value;
+
+            const payload = {
+                rpcEnabled: enabled,
+                rpcSettings: {
+                    type,
+                    name,
+                    details,
+                    state,
+                    largeImageKey
+                }
+            };
+
+            const res = await fetch(`${API_URL}/settings/rpc`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                alert('RPC Updated!');
+            } else {
+                alert('Error: ' + data.error);
+            }
+        }
+    </script>
+
+</body>
+
+</html>

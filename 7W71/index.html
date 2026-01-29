@@ -1,0 +1,234 @@
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Blackeker - Discord Bot Yönetim Paneli">
+    <title>Blackeker - Bot Yönetim Paneli</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="app-icon"></div>
+                <div class="app-title">Blackeker</div>
+            </div>
+            <ul class="sidebar-menu">
+                <li class="menu-item active" data-section="general-settings">
+                    <i class="fas fa-cogs"></i>
+                    <span>Ana Ayarlar</span>
+                </li>
+                <li class="menu-item" data-section="command-management">
+                    <i class="fas fa-terminal"></i>
+                    <span>Komutlar</span>
+                </li>
+                <li class="menu-item" data-section="live-log">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Canlı Log</span>
+                </li>
+                <li class="menu-item" data-section="gem-system">
+                    <i class="fas fa-gem"></i>
+                    <span>Gem Sistemi</span>
+                </li>
+                <li class="menu-item" data-section="token-management">
+                    <i class="fas fa-users"></i>
+                    <span>Yan Hesaplar</span>
+                </li>
+                <li class="menu-item" data-section="app-settings">
+                    <i class="fas fa-cog"></i>
+                    <span>Uygulama Ayarları</span>
+                </li>
+                <li class="menu-item" data-section="captcha-solver-section">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Captcha Çözücü</span>
+                </li>
+                <li class="menu-item" data-section="rpc-settings-section">
+                    <i class="fas fa-gamepad"></i>
+                    <span>RPC Ayarları</span>
+                </li>
+                <li class="menu-item" data-section="potato-sending-section">
+                    <i class="fas fa-carrot"></i>
+                    <span>Patates Gönderme</span>
+                </li>
+            </ul>
+        </div>
+        <div class="main-content">
+            <div class="title-bar">
+                <div class="window-controls">
+                    <button class="title-bar-btn" id="custom-minimize-btn">−</button>
+                    <button class="title-bar-btn" id="custom-hide-btn">_</button>
+                    <button class="title-bar-btn" id="custom-devtools-btn">⚙️</button>
+                    <button class="title-bar-btn" id="custom-close-btn">×</button>
+                </div>
+            </div>
+            <div class="content-area">
+               <section class="section" id="general-settings">
+                <h2>Ana Bot Ayarları</h2>
+                <div class="status-box">
+                    <span id="status-indicator"></span>
+                    <span id="status-text">Durum: Durduruldu</span>
+                </div>
+                <div class="form-group">
+                    <label for="token-input">Discord Token:</label>
+                    <div class="input-group">
+                        <input type="password" id="token-input" placeholder="Tokenınızı buraya girin">
+                        <button class="toggle-visibility" onclick="togglePasswordVisibility('token-input', this)">👁️</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="channel-input">Kanal ID:</label>
+                    <input type="text" id="channel-input" placeholder="Mesajların gönderileceği kanal ID">
+                </div>
+
+                <div class="action-buttons">
+                    <button id="btn-toggle" class="btn primary">▶️ Botu Başlat</button>
+                    <button id="btn-toggle-sending" class="btn secondary" style="display: none;">▶️ Gönderimi Başlat</button>
+                </div>
+            </section>
+
+                <section class="section" id="command-management" style="display: none;">
+                    <h2>Komut Yönetimi</h2>
+                    <div id="commands-list"></div>
+                    <button id="btn-add-command" class="btn secondary">+ Yeni Komut Ekle</button>
+                </section>
+
+                <section class="section" id="live-log" style="display: none;">
+                    <h2>Canlı Log</h2>
+                    <div class="action-buttons" style="margin-bottom: 15px;">
+                        <button class="btn secondary" onclick="clearLog()">Temizle</button>
+                        <button class="btn secondary" onclick="toggleAutoScroll()">Otomatik Kaydırmayı Değiştir</button>
+                        <button class="btn secondary" onclick="exportLog()">Logları Dışa Aktar</button>
+                    </div>
+                    <pre id="log-output"></pre>
+                </section>
+
+                <section class="section" id="gem-system" style="display: none;">
+                    <h2>Gem Sistemi</h2>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="gem-system-enabled">
+                            Gem Sistemini Aktif Et
+                        </label>
+                    </div>
+                    <div id="gems-list"></div>
+                    <button id="btn-add-gem" class="btn secondary">+ Yeni Gem Ekle</button>
+                </section>
+
+                <section class="section" id="token-management" style="display: none;">
+                    <h2>Yan Hesaplar</h2>
+
+                    <div class="form-group">
+                        <label for="bulk-token-input">Toplu Token Ekle</label>
+                        <textarea id="bulk-token-input" rows="5" placeholder="Her satıra bir token gelecek şekilde yapıştırın..."></textarea>
+                        <button id="btn-bulk-add-tokens" class="btn secondary" style="margin-top: 10px;">Tokenları Ekle ve Kontrol Et</button>
+                    </div>
+
+                    <div id="account-config-list">
+                        <!-- Unified account cards will be rendered here -->
+                    </div>
+
+                    <hr style="margin: 30px 0; border-color: var(--border-color);">
+
+                    <div class="form-group" style="margin-top: 20px;">
+                        <label for="guild-id-input">Sunucu ID</label>
+                        <input type="text" id="guild-id-input" placeholder="Kanalların oluşturulacağı sunucunun IDsi">
+                        <button id="btn-create-channels" class="btn primary" style="margin-top: 10px;">Kanalları Oluştur ve Yapılandır</button>
+                    </div>
+
+                    <div class="action-buttons" style="margin-top: 20px;">
+                        <button id="btn-toggle-random-bots" class="btn primary">🤖 Rastgele Botları Başlat</button>
+                        <button id="btn-reset-potato-log" class="btn secondary">Sıfırla</button>
+                    </div>
+                </section>
+
+                <section class="section" id="app-settings" style="display: none;">
+                    <h2>Uygulama Ayarları</h2>
+                    <div class="action-buttons">
+                        <button id="btn-export" class="btn secondary">Ayarları Dışa Aktar</button>
+                        <button id="btn-import" class="btn secondary">Ayarları İçe Aktar</button>
+                        <button id="btn-open-log" class="btn secondary">Log Klasörünü Aç</button>
+                        <button id="btn-open-data" class="btn secondary">Veri Klasörünü Aç</button>
+                        <button id="btn-check-tokens" class="btn secondary">Tokenları Kontrol Et</button>
+                        <button id="btn-reset" class="btn secondary" onclick="resetAllSettings()">Tüm Ayarları Sıfırla</button>
+                    </div>
+                </section>
+
+                <section class="section" id="captcha-solver-section" style="display: none;">
+                    <h2>Captcha Çözücü</h2>
+                    <p>Aktif captcha görevleri aşağıda listelenmiştir.</p>
+                    <div id="captcha-list"></div>
+                </section>
+
+                <section class="section" id="rpc-settings-section" style="display: none;">
+                    <h2>RPC Ayarları</h2>
+                    <div class="tabs">
+                        <button class="tab-link active" data-tab="main-bot-rpc-tab">Ana Bot</button>
+                        <button class="tab-link" data-tab="side-bots-rpc-tab">Yan Hesaplar</button>
+                    </div>
+
+                    <div id="main-bot-rpc-tab" class="tab-content active">
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="main-rpc-enabled">
+                                Ana Bot RPC'yi Aktif Et
+                            </label>
+                        </div>
+                        <div id="main-rpc-settings" style="display: none; margin-left: 20px; padding: 15px; border: 1px solid var(--border-color); border-radius: 5px;">
+                            <h4>RPC Ayarları</h4>
+                            <div class="form-group">
+                                <label>Application ID:</label>
+                                <input type="text" id="main-rpc-app-id" placeholder="Discord Application ID">
+                            </div>
+                            <div class="form-group">
+                                <label>Oyun Adı:</label>
+                                <input type="text" id="main-rpc-name" placeholder="Örn: My Custom Game">
+                            </div>
+                            <div class="form-group">
+                                <label>Details:</label>
+                                <input type="text" id="main-rpc-details" placeholder="Örn: Playing with friends">
+                            </div>
+                            <div class="form-group">
+                                <label>State:</label>
+                                <input type="text" id="main-rpc-state" placeholder="Örn: In a match">
+                            </div>
+                            <div class="form-group">
+                                <label>Büyük Resim Key:</label>
+                                <input type="text" id="main-rpc-large-image" placeholder="large_image">
+                            </div>
+                            <div class="form-group">
+                                <label>Büyük Resim Text:</label>
+                                <input type="text" id="main-rpc-large-text" placeholder="Hover text">
+                            </div>
+                            <div class="form-group">
+                                <label>Küçük Resim Key:</label>
+                                <input type="text" id="main-rpc-small-image" placeholder="small_image">
+                            </div>
+                            <div class="form-group">
+                                <label>Küçük Resim Text:</label>
+                                <input type="text" id="main-rpc-small-text" placeholder="Hover text">
+                            </div>
+                            <div id="main-rpc-buttons-list"></div>
+                            <button class="btn secondary" id="btn-add-main-rpc-button">+ Buton Ekle</button>
+                            <button class="btn primary" id="btn-save-main-rpc" style="margin-top: 10px;">RPC'yi Kaydet</button>
+                        </div>
+                    </div>
+
+                    <div id="side-bots-rpc-tab" class="tab-content">
+                        <p>Yan hesaplar için RPC ayarları burada yönetilecek.</p>
+                    </div>
+                </section>
+
+                <section class="section" id="potato-sending-section" style="display: none;">
+                    <h2>Patates Gönderme</h2>
+                    <div id="potato-account-list"></div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
