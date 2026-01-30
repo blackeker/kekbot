@@ -19,6 +19,11 @@ function attachAutoDeleteToSpamBot(botId, client, config) {
         const adConfig = autoDeleteConfigs.get(botId);
         if (!adConfig || !adConfig.enabled || adConfig.channelId !== message.channel.id) return;
 
+        // Don't try to delete bot's own messages
+        if (message.author && message.author.id === client.user.id) {
+            return;
+        }
+
         if (message.embeds.length > 0) {
             const shouldDelete = message.embeds.some(embed => {
                 return embed.color && adConfig.colors.includes(embed.color);
@@ -28,7 +33,13 @@ function attachAutoDeleteToSpamBot(botId, client, config) {
                 try {
                     console.log(`[AutoDelete-${botId}] Attempting to delete message ${message.id} (author: ${message.author?.tag || 'unknown'}, color: ${message.embeds[0]?.color})`);
 
-                    const deletedMessage = await message.delete();
+                    // Add timeout to prevent hanging
+                    const deletePromise = message.delete();
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('Delete timeout after 5s')), 5000)
+                    );
+
+                    const deletedMessage = await Promise.race([deletePromise, timeoutPromise]);
 
                     // Verify deletion
                     if (deletedMessage) {
@@ -38,7 +49,9 @@ function attachAutoDeleteToSpamBot(botId, client, config) {
                     }
                 } catch (e) {
                     console.error(`[AutoDelete-${botId}] ✗ Failed to delete ${message.id}: ${e.message}`);
-                    console.error(`[AutoDelete-${botId}] Error details:`, e);
+                    if (e.code) {
+                        console.error(`[AutoDelete-${botId}] Discord error code: ${e.code}`);
+                    }
                 }
             }
         }

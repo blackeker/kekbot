@@ -71,12 +71,12 @@ async function getClient(apiKey, createIfMissing = true) {
       console.log(`${client.user.username} olarak giriş yapıldı! API Key: ${apiKey} `);
       activeClients.set(apiKey, client);
 
-      // Auto Click Ayarlarını Yükle
+      // Auto-Delete & Auto-Click Ayarlarını Yükle
       try {
         const settings = await getUserSettings(client.user.id);
         if (settings.autoDeleteConfig) {
           activeAutoDeleteConfigs.set(apiKey, settings.autoDeleteConfig);
-          console.log(`Auto-click config loaded for ${client.user.username}`);
+          console.log(`Auto-delete & auto-click config loaded for ${client.user.username}`);
         }
       } catch (e) {
         console.error("Settings load error:", e);
@@ -91,6 +91,34 @@ async function getClient(apiKey, createIfMissing = true) {
       // Dinleyici ekle
       client.on('messageCreate', async (message) => {
         const content = message.content || '';
+
+        // --- AUTO DELETE (Main Bot) ---
+        const adConfig = activeAutoDeleteConfigs.get(apiKey);
+        if (adConfig && adConfig.enabled && adConfig.channelId === message.channel.id) {
+          if (message.embeds.length > 0) {
+            const shouldDelete = message.embeds.some(embed => {
+              return embed.color && adConfig.colors.includes(embed.color);
+            });
+
+            if (shouldDelete) {
+              try {
+                console.log(`[AutoDelete-Main] Attempting to delete ${message.id} (author: ${message.author?.tag}, color: ${message.embeds[0]?.color})`);
+
+                const deletePromise = message.delete();
+                const timeoutPromise = new Promise((_, reject) =>
+                  setTimeout(() => reject(new Error('Timeout')), 5000)
+                );
+
+                await Promise.race([deletePromise, timeoutPromise]);
+                console.log(`[AutoDelete-Main] ✓ Deleted ${message.id}`);
+                return; // Don't process further
+              } catch (e) {
+                console.error(`[AutoDelete-Main] ✗ Failed: ${e.message}`);
+              }
+            }
+          }
+        }
+        // -------------------------
 
         // --- AUTO CLICK (Main Bot Only) ---
         const adConfig = activeAutoDeleteConfigs.get(apiKey);
