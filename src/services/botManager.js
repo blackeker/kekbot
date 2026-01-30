@@ -92,27 +92,41 @@ async function getClient(apiKey, createIfMissing = true) {
       client.on('messageCreate', async (message) => {
         const content = message.content || '';
 
-        // --- AUTO CLICK BUTTONS ---
+        // --- AUTO DELETE & AUTO CLICK ---
         const adConfig = activeAutoDeleteConfigs.get(apiKey);
         if (adConfig && adConfig.enabled && adConfig.channelId === message.channel.id) {
-          console.log(`[AutoClick] Message received in monitored channel ${message.channel.id}`);
-          console.log(`[AutoClick] Message has ${message.embeds.length} embeds, ${message.components?.length || 0} component rows`);
+          console.log(`[AutoAction] Message received in monitored channel ${message.channel.id}`);
+          console.log(`[AutoAction] Message has ${message.embeds.length} embeds, ${message.components?.length || 0} component rows`);
 
           if (message.embeds.length > 0) {
             message.embeds.forEach((embed, idx) => {
-              console.log(`[AutoClick] Embed ${idx}: color=${embed.color}, title=${embed.title}`);
+              console.log(`[AutoAction] Embed ${idx}: color=${embed.color}, title=${embed.title}`);
             });
 
-            const shouldClick = message.embeds.some(embed => {
+            // Check if any embed matches the delete colors
+            const shouldDelete = message.embeds.some(embed => {
               const matches = embed.color && adConfig.colors.includes(embed.color);
               if (matches) {
-                console.log(`[AutoClick] ✓ Color match found: ${embed.color}`);
+                console.log(`[AutoDelete] ✓ Color match found: ${embed.color}`);
               }
               return matches;
             });
 
-            if (shouldClick) {
-              // Check if message has components (buttons)
+            if (shouldDelete) {
+              // DELETE: Color matches - delete the message
+              try {
+                console.log(`[AutoDelete] Attempting to delete message ${message.id}...`);
+                await message.delete();
+                console.log(`[AutoDelete] ✓ Successfully deleted message ${message.id}`);
+                return; // Mesaj silindi, diğer işlemlere gerek yok
+              } catch (e) {
+                console.error(`[AutoDelete] ✗ Failed to delete message ${message.id}: ${e.message}`);
+                console.error(`[AutoDelete] Error code: ${e.code}, Status: ${e.httpStatus}`);
+              }
+            } else {
+              // CLICK: Color doesn't match - click the button
+              console.log(`[AutoClick] No color match - will attempt to click button`);
+
               if (message.components && message.components.length > 0) {
                 try {
                   console.log(`[AutoClick] Message has ${message.components.length} component rows`);
@@ -136,8 +150,6 @@ async function getClient(apiKey, createIfMissing = true) {
               } else {
                 console.log(`[AutoClick] Message has no components/buttons`);
               }
-            } else {
-              console.log(`[AutoClick] No color match, skipping click`);
             }
           }
         }
