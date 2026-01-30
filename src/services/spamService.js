@@ -116,28 +116,54 @@ module.exports = {
         const bots = getSpamBots(userId);
         let count = 0;
 
-        for (const bot of bots) {
+        const tasks = bots.map(async (bot) => {
+            let client;
+            let isTemp = false;
+
             if (activeSpamClients.has(bot.id)) {
-                const client = activeSpamClients.get(bot.id);
+                client = activeSpamClients.get(bot.id);
+            } else {
+                try {
+                    client = new Client({ checkUpdate: false });
+                    isTemp = true;
+                    // Login with timout to prevent hanging
+                    await new Promise((resolve, reject) => {
+                        client.once('ready', resolve);
+                        client.login(bot.token).catch(reject);
+                        setTimeout(() => reject(new Error('Login timeout')), 15000);
+                    });
+                } catch (e) {
+                    console.error(`[Potato] Failed to login bot ${bot.id}: ${e.message}`);
+                    if (isTemp && client) client.destroy();
+                    return;
+                }
+            }
+
+            try {
                 const config = JSON.parse(bot.config || '{}');
                 const channels = config.channels || [];
 
                 // İlk kanala gönder (veya hepsine? Genelde tek kanal spam için yeterli)
                 if (channels.length > 0) {
-                    try {
-                        const channelId = channels[0];
-                        const channel = await client.channels.fetch(channelId).catch(() => null);
-                        if (channel) {
-                            await channel.send(`+potato ${targetUserId}`);
-                            count++;
-                            console.log(`[Potato] ${client.user.tag} sent potato to ${targetUserId}`);
-                        }
-                    } catch (e) {
-                        console.error(`[Potato] Error for bot ${bot.id}: ${e.message}`);
+                    const channelId = channels[0];
+                    const channel = await client.channels.fetch(channelId).catch(() => null);
+                    if (channel) {
+                        await channel.send(`+potato ${targetUserId}`);
+                        // Atomik olmayan sayac artisi ama Promise.all bekledigi icin sonuc tutarli olmayabilir.
+                        // map icinde dis degiskeni guncelliyoruz.
+                        // JS single thread oldugu icin race condition olmaz (await disinda).
+                        count++;
+                        console.log(`[Potato] ${client.user.tag} sent potato to ${targetUserId}`);
                     }
                 }
+            } catch (e) {
+                console.error(`[Potato] Error for bot ${bot.id}: ${e.message}`);
+            } finally {
+                if (isTemp && client) client.destroy();
             }
-        }
+        });
+
+        await Promise.all(tasks);
         return count;
     }
 };
