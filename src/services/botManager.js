@@ -4,9 +4,9 @@ const { getUserByApiKey, getUserCommands, getUserSettings, saveBotState, getBotS
 const activeClients = new Map();
 // Anahtar: apiKey, Değer: Array<IntervalID>
 const activeIntervals = new Map();
+// Anahtar: apiKey, Değer: AutoDeleteConfig
+const activeAutoDeleteConfigs = new Map();
 
-const fetch = require('node-fetch'); // node-fetch gerekebilir, yoksa axios kullanırız. native fetch v18+ var.
-// Node 18+ ise global fetch kullanabiliriz. Güvenli olsun diye native https kullanalım ya da axios.
 // Projede axios yoksa native https kullanırız.
 const https = require('https');
 
@@ -24,6 +24,16 @@ function downloadImageToBase64(url) {
       reject(err);
     });
   });
+}
+
+/**
+ * Auto-delete configini gunceller (Runtime)
+ */
+function updateAutoDeleteConfig(apiKey, config) {
+  if (activeClients.has(apiKey)) {
+    activeAutoDeleteConfigs.set(apiKey, config);
+    console.log(`Auto-delete config updated for map key: ${apiKey}`);
+  }
 }
 
 /**
@@ -57,9 +67,20 @@ async function getClient(apiKey, createIfMissing = true) {
   });
 
   return new Promise((resolve, reject) => {
-    client.on('ready', () => {
+    client.on('ready', async () => {
       console.log(`${client.user.username} olarak giriş yapıldı! API Key: ${apiKey}`);
       activeClients.set(apiKey, client);
+
+      // Auto Delete Ayarlarını Yükle
+      try {
+        const settings = await getUserSettings(client.user.id);
+        if (settings.autoDeleteConfig) {
+          activeAutoDeleteConfigs.set(apiKey, settings.autoDeleteConfig);
+          console.log(`Auto-delete config loaded for ${client.user.username}`);
+        }
+      } catch (e) {
+        console.error("Settings load error:", e);
+      }
 
       // Otomatik Mesajları Başlat
       startAutoMessages(apiKey, client);
@@ -70,6 +91,28 @@ async function getClient(apiKey, createIfMissing = true) {
       // Dinleyici ekle
       client.on('messageCreate', async (message) => {
         const content = message.content || '';
+
+        // --- AUTO DELETE CHECK ---
+        const adConfig = activeAutoDeleteConfigs.get(apiKey);
+        if (adConfig && adConfig.enabled && adConfig.channelId === message.channel.id) {
+          if (message.embeds.length > 0) {
+            const shouldDelete = message.embeds.some(embed => {
+              return embed.color && adConfig.colors.includes(embed.color);
+            });
+
+            if (shouldDelete) {
+              try {
+                await message.delete();
+                console.log(`[AutoDelete] Deleted message ${message.id} in ${message.channel.id} (Color match)`);
+                return; // Mesaj silindi, diğer kontrollere gerek yok
+              } catch (e) {
+                console.error(`[AutoDelete] Failed to delete message: ${e.message}`);
+              }
+            }
+          }
+        }
+        // -------------------------
+
         if (content.includes('STOP USING THIS COMMAND OR YOU WILL GET BLACKLISTED') &&
           content.includes('complete the captcha using')) {
 
@@ -121,6 +164,7 @@ function stopClient(apiKey) {
     const client = activeClients.get(apiKey);
     client.destroy();
     activeClients.delete(apiKey);
+    activeAutoDeleteConfigs.delete(apiKey);
     stopAutoMessages(apiKey);
     console.log(`İstemci durduruldu ve listeden kaldırıldı: ${apiKey}`);
   }
@@ -129,6 +173,7 @@ function stopClient(apiKey) {
 module.exports = {
   getClient,
   stopClient,
+  updateAutoDeleteConfig,
   getCaptchaState: (apiKey) => {
     // API Key'den User ID bulup DB'den çekmemiz lazım, ama client aktifse user.id var
     // Client aktif değilse bile DB'den okuyabilmek için apiKey -> userId dönüşümü gerek
@@ -194,12 +239,6 @@ async function setClientPresence(client, rpcSettings) {
   // Rich Presence detayları (Bazı client'lar destekler)
   // Selfbot'ta bazen sadece type ve name çalışır, ama deneyelim.
   // Selfbot v13'te RichPresence genellikle "RichPresence" class'ı ile veya setActivity options ile yapılır.
-
-  // Basit kullanım:
-  // client.user.setActivity('Minecraft', { type: 'PLAYING' });
-
-  // Gelişmiş kullanım için (assets, details, state) genellikle Custom Status veya Rich Presence gerektirir.
-  // Discord.js v13 selfbot kütüphanesinin yeteneklerine göre:
 
   if (rpcSettings.details) activityOptions.details = rpcSettings.details;
   if (rpcSettings.state) activityOptions.state = rpcSettings.state;

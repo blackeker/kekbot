@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getUserSettings, saveUserSettings } = require('../services/databaseService');
-const { updatePresence } = require('../services/botManager');
+const { updatePresence, updateAutoDeleteConfig } = require('../services/botManager');
 const { info, error } = require('../utils/logger');
 
 // Get Settings
@@ -60,5 +60,36 @@ router.post('/rpc', async (req, res) => {
 router.post('/gems', (req, res) => res.status(501).json({ success: false, error: 'Not implemented' }));
 router.get('/export', (req, res) => res.status(501).json({ success: false, error: 'Not implemented' }));
 router.post('/import', (req, res) => res.status(501).json({ success: false, error: 'Not implemented' }));
+
+// Update Auto Delete Settings
+router.post('/auto-delete', async (req, res) => {
+    try {
+        const userId = req.userId;
+        const apiKey = req.headers.authorization || req.headers['x-api-key'];
+        const { enabled, channelId, colors } = req.body;
+
+        if (typeof enabled !== 'boolean' || !channelId || !Array.isArray(colors)) {
+            return res.status(400).json({ success: false, error: 'Invalid payload: enabled(bool), channelId(string), colors(array) required.' });
+        }
+
+        const config = { enabled, channelId, colors };
+
+        // 1. Save to DB
+        // saveUserSettings partial update yapar, autoDeleteConfig tek alan olarak guncellenir
+        await saveUserSettings(userId, { autoDeleteConfig: config });
+
+        // 2. Update Runtime
+        if (updateAutoDeleteConfig) {
+            updateAutoDeleteConfig(apiKey, config);
+        }
+
+        info(`Auto-delete settings updated for user: ${userId}`);
+        res.json({ success: true, message: 'Auto-delete configurasyonu guncellendi.' });
+
+    } catch (e) {
+        error(`Auto-delete update error: ${e.message}`);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
 
 module.exports = router;

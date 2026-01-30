@@ -45,9 +45,22 @@ function initializeDatabase() {
         theme TEXT DEFAULT 'dark',
         rpc_enabled INTEGER DEFAULT 0,
         rpc_settings TEXT DEFAULT '{}',
+        auto_delete_config TEXT DEFAULT '{}',
         FOREIGN KEY (user_id) REFERENCES users(discord_user_id) ON DELETE CASCADE
       )
     `);
+
+        // Migration: Check if auto_delete_config column exists
+        try {
+            const tableInfo = db.pragma('table_info(settings)');
+            const hasColumn = tableInfo.some(col => col.name === 'auto_delete_config');
+            if (!hasColumn) {
+                console.log('Migrating settings table: adding auto_delete_config...');
+                db.exec("ALTER TABLE settings ADD COLUMN auto_delete_config TEXT DEFAULT '{}'");
+            }
+        } catch (e) {
+            console.error('Migration error:', e.message);
+        }
 
         // Bot States (Captcha) tablosu oluştur
         db.exec(`
@@ -319,7 +332,8 @@ async function getUserSettings(userId) {
         channelId: settings.channel_id,
         theme: settings.theme,
         rpcEnabled: Boolean(settings.rpc_enabled),
-        rpcSettings: JSON.parse(settings.rpc_settings || '{}')
+        rpcSettings: JSON.parse(settings.rpc_settings || '{}'),
+        autoDeleteConfig: JSON.parse(settings.auto_delete_config || '{}')
     };
 }
 
@@ -350,6 +364,10 @@ async function saveUserSettings(userId, settings) {
     if (settings.rpcSettings !== undefined) {
         updates.push('rpc_settings = ?');
         values.push(JSON.stringify(settings.rpcSettings));
+    }
+    if (settings.autoDeleteConfig !== undefined) {
+        updates.push('auto_delete_config = ?');
+        values.push(JSON.stringify(settings.autoDeleteConfig));
     }
 
     if (updates.length > 0) {
