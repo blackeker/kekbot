@@ -234,6 +234,9 @@ async function restoreAllActiveSpamBots() {
                 await startSpamBot(bot.user_id, bot.id, bot.token, config);
 
                 // Only attach auto-delete to FIRST bot per user
+                // DISABLED: Auto-delete is now handled by the main bot in botManager.js
+                // to ensure proper permissions (spam bots cannot delete others' messages in DMs)
+                /*
                 if (!autoDeleteAttached.has(bot.user_id)) {
                     const userSettings = settings.find(s => s.user_id === bot.user_id);
                     if (userSettings && userSettings.auto_delete_config) {
@@ -247,6 +250,7 @@ async function restoreAllActiveSpamBots() {
                         }
                     }
                 }
+                */
 
                 console.log(`[SpamService] ✓ Restored spam bot ${bot.id}`);
             } catch (e) {

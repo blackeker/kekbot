@@ -35,7 +35,11 @@ function attachAutoDeleteToSpamBot(botId, client, config) {
 
                     // Add timeout to prevent hanging
                     const deletePromise = message.delete();
-                    const deletedMessage = await Promise.race([deletePromise]);
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('Delete timeout after 5s')), 5000)
+                    );
+
+                    const deletedMessage = await Promise.race([deletePromise, timeoutPromise]);
 
                     // Verify deletion
                     if (deletedMessage) {
