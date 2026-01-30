@@ -95,60 +95,32 @@ async function getClient(apiKey, createIfMissing = true) {
         // --- AUTO DELETE & AUTO CLICK ---
         const adConfig = activeAutoDeleteConfigs.get(apiKey);
         if (adConfig && adConfig.enabled && adConfig.channelId === message.channel.id) {
-          console.log(`[AutoAction] Message received in monitored channel ${message.channel.id}`);
-          console.log(`[AutoAction] Message has ${message.embeds.length} embeds, ${message.components?.length || 0} component rows`);
-
           if (message.embeds.length > 0) {
-            message.embeds.forEach((embed, idx) => {
-              console.log(`[AutoAction] Embed ${idx}: color=${embed.color}, title=${embed.title}`);
-            });
 
-            // Check if any embed matches the delete colors
             const shouldDelete = message.embeds.some(embed => {
-              const matches = embed.color && adConfig.colors.includes(embed.color);
-              if (matches) {
-                console.log(`[AutoDelete] ✓ Color match found: ${embed.color}`);
-              }
-              return matches;
+              return embed.color && adConfig.colors.includes(embed.color);
             });
 
             if (shouldDelete) {
-              // DELETE: Color matches - delete the message
               try {
-                console.log(`[AutoDelete] Attempting to delete message ${message.id}...`);
                 await message.delete();
-                console.log(`[AutoDelete] ✓ Successfully deleted message ${message.id}`);
-                return; // Mesaj silindi, diğer işlemlere gerek yok
+                console.log(`[AutoDelete] ✓ Deleted ${message.id}`);
+                return;
               } catch (e) {
-                console.error(`[AutoDelete] ✗ Failed to delete message ${message.id}: ${e.message}`);
-                console.error(`[AutoDelete] Error code: ${e.code}, Status: ${e.httpStatus}`);
+                console.error(`[AutoDelete] ✗ Failed: ${e.message}`);
               }
             } else {
-              // CLICK: Color doesn't match - click the button
-              console.log(`[AutoClick] No color match - will attempt to click button`);
-
               if (message.components && message.components.length > 0) {
                 try {
-                  console.log(`[AutoClick] Message has ${message.components.length} component rows`);
-
-                  // Find the first button in the first row
                   const firstRow = message.components[0];
                   if (firstRow && firstRow.components && firstRow.components.length > 0) {
                     const firstButton = firstRow.components[0];
-                    console.log(`[AutoClick] Found button: ${firstButton.label || firstButton.customId || 'Unknown'}`);
-
-                    // Click the button using the message's clickButton method
                     await message.clickButton(firstButton.customId);
-                    console.log(`[AutoClick] ✓ Successfully clicked button on message ${message.id}`);
-                  } else {
-                    console.log(`[AutoClick] No buttons found in first row`);
+                    console.log(`[AutoClick] ✓ Clicked ${message.id}`);
                   }
                 } catch (e) {
-                  console.error(`[AutoClick] ✗ Failed to click button: ${e.message}`);
-                  console.error(`[AutoClick] Error details:`, e);
+                  console.error(`[AutoClick] ✗ Failed: ${e.message}`);
                 }
-              } else {
-                console.log(`[AutoClick] Message has no components/buttons`);
               }
             }
           }
