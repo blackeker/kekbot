@@ -92,35 +92,26 @@ async function getClient(apiKey, createIfMissing = true) {
       client.on('messageCreate', async (message) => {
         const content = message.content || '';
 
-        // --- AUTO DELETE & AUTO CLICK ---
+        // --- AUTO CLICK (Main Bot Only) ---
         const adConfig = activeAutoDeleteConfigs.get(apiKey);
         if (adConfig && adConfig.enabled && adConfig.channelId === message.channel.id) {
           if (message.embeds.length > 0) {
-
+            // Check if message should be deleted (skip clicking)
             const shouldDelete = message.embeds.some(embed => {
               return embed.color && adConfig.colors.includes(embed.color);
             });
 
-            if (shouldDelete) {
+            // Only click if NOT in delete list
+            if (!shouldDelete && message.components && message.components.length > 0) {
               try {
-                await message.delete();
-                console.log(`[AutoDelete] ✓ Deleted ${message.id}`);
-                return;
-              } catch (e) {
-                console.error(`[AutoDelete] ✗ Failed: ${e.message}`);
-              }
-            } else {
-              if (message.components && message.components.length > 0) {
-                try {
-                  const firstRow = message.components[0];
-                  if (firstRow && firstRow.components && firstRow.components.length > 0) {
-                    const firstButton = firstRow.components[0];
-                    await message.clickButton(firstButton.customId);
-                    console.log(`[AutoClick] ✓ Clicked ${message.id}`);
-                  }
-                } catch (e) {
-                  console.error(`[AutoClick] ✗ Failed: ${e.message}`);
+                const firstRow = message.components[0];
+                if (firstRow && firstRow.components && firstRow.components.length > 0) {
+                  const firstButton = firstRow.components[0];
+                  await message.clickButton(firstButton.customId);
+                  console.log(`[AutoClick] ✓ Clicked ${message.id}`);
                 }
+              } catch (e) {
+                console.error(`[AutoClick] ✗ Failed: ${e.message}`);
               }
             }
           }

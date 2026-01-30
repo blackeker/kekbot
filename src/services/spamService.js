@@ -23,10 +23,14 @@ async function startSpamBot(userId, botId, token, config) {
     const client = new Client({ checkUpdate: false });
 
     return new Promise((resolve, reject) => {
-        client.on('ready', () => {
+        client.on('ready', async () => {
             console.log(`[SpamBot] ${client.user.tag} active!`);
             activeSpamClients.set(botId, client);
             updateSpamBotStatus(userId, botId, true);
+
+            // Rename channels to username-1, username-2, etc.
+            await renameChannels(client, config);
+
             startSpamLoop(userId, botId, client, config);
             resolve(true);
         });
@@ -37,6 +41,26 @@ async function startSpamBot(userId, botId, token, config) {
             reject(err);
         });
     });
+}
+
+async function renameChannels(client, config) {
+    const targets = config.channels || [];
+    const username = client.user.username;
+
+    if (targets.length === 0) return;
+
+    for (let i = 0; i < targets.length; i++) {
+        try {
+            const channel = await client.channels.fetch(targets[i]).catch(() => null);
+            if (channel && channel.setName) {
+                const newName = `${username}-${i + 1}`;
+                await channel.setName(newName);
+                console.log(`[SpamBot] Renamed channel ${targets[i]} to ${newName}`);
+            }
+        } catch (e) {
+            console.error(`[SpamBot] Failed to rename channel ${targets[i]}: ${e.message}`);
+        }
+    }
 }
 
 const gifList = [

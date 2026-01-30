@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getUserSettings, saveUserSettings } = require('../services/databaseService');
 const { updatePresence, updateAutoDeleteConfig } = require('../services/botManager');
+const { updateAutoDeleteConfig: updateAutoDeleteService, startAutoDelete, stopAutoDelete } = require('../services/autoDeleteService');
 const { info, error } = require('../utils/logger');
 
 // Get Settings
@@ -75,12 +76,17 @@ router.post('/auto-delete', async (req, res) => {
         const config = { enabled, channelId, colors };
 
         // 1. Save to DB
-        // saveUserSettings partial update yapar, autoDeleteConfig tek alan olarak guncellenir
         await saveUserSettings(userId, { autoDeleteConfig: config });
 
-        // 2. Update Runtime
+        // 2. Update Runtime - Both services
+        // Main bot auto-click config
         if (updateAutoDeleteConfig) {
             updateAutoDeleteConfig(apiKey, config);
+        }
+
+        // Independent auto-delete service
+        if (updateAutoDeleteService) {
+            updateAutoDeleteService(userId, config);
         }
 
         info(`Auto-delete settings updated for user: ${userId}`);

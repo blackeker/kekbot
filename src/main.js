@@ -27,9 +27,15 @@ try {
 
     // Restore active spam bots (independent from main bot)
     const { restoreAllActiveSpamBots } = require('./services/spamService');
+    const { restoreAllAutoDelete } = require('./services/autoDeleteService');
+
     setTimeout(() => {
         restoreAllActiveSpamBots().catch(err => {
             error(`Failed to restore spam bots: ${err.message}`);
+        });
+
+        restoreAllAutoDelete().catch(err => {
+            error(`Failed to restore auto-delete: ${err.message}`);
         });
     }, 2000); // 2 saniye bekle (DB hazır olsun)
 
