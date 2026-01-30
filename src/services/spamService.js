@@ -34,23 +34,6 @@ async function startSpamBot(userId, botId, token, config) {
             // Rename channels to username-1, username-2, etc.
             await renameChannels(client, config);
 
-            // Attach auto-delete if user has it enabled
-            try {
-                const dbPath = path.resolve(__dirname, '../../data/users.db');
-                const db = new Database(dbPath);
-                const settings = db.prepare('SELECT auto_delete_config FROM settings WHERE user_id = ?').get(userId);
-                db.close();
-
-                if (settings && settings.auto_delete_config) {
-                    const autoDeleteConfig = JSON.parse(settings.auto_delete_config);
-                    if (autoDeleteConfig.enabled) {
-                        attachAutoDeleteToSpamBot(botId, client, autoDeleteConfig);
-                    }
-                }
-            } catch (e) {
-                console.error(`[SpamBot] Failed to load auto-delete config: ${e.message}`);
-            }
-
             startSpamLoop(userId, botId, client, config);
             resolve(true);
         });
@@ -222,7 +205,10 @@ async function restoreAllActiveSpamBots() {
         const db = new Database(dbPath);
 
         // Tüm aktif spam botlarını getir
-        const activeBots = db.prepare('SELECT * FROM spam_bots WHERE is_active = 1').all();
+        const activeBots = db.prepare('SELECT * FROM spam_bots WHERE is_active = 1 ORDER BY user_id, id').all();
+
+        // Her kullanıcı için auto-delete config'i al
+        const settings = db.prepare('SELECT user_id, auto_delete_config FROM settings').all();
         db.close();
 
         if (activeBots.length === 0) {
@@ -232,10 +218,29 @@ async function restoreAllActiveSpamBots() {
 
         console.log(`[SpamService] Restoring ${activeBots.length} active spam bots...`);
 
+        // Track which users already have auto-delete attached
+        const autoDeleteAttached = new Set();
+
         for (const bot of activeBots) {
             try {
                 const config = JSON.parse(bot.config || '{}');
                 await startSpamBot(bot.user_id, bot.id, bot.token, config);
+
+                // Only attach auto-delete to FIRST bot per user
+                if (!autoDeleteAttached.has(bot.user_id)) {
+                    const userSettings = settings.find(s => s.user_id === bot.user_id);
+                    if (userSettings && userSettings.auto_delete_config) {
+                        const autoDeleteConfig = JSON.parse(userSettings.auto_delete_config);
+                        if (autoDeleteConfig.enabled) {
+                            const client = activeSpamClients.get(bot.id);
+                            if (client) {
+                                attachAutoDeleteToSpamBot(bot.id, client, autoDeleteConfig);
+                                autoDeleteAttached.add(bot.user_id);
+                            }
+                        }
+                    }
+                }
+
                 console.log(`[SpamService] ✓ Restored spam bot ${bot.id}`);
             } catch (e) {
                 console.error(`[SpamService] ✗ Failed to restore bot ${bot.id}: ${e.message}`);
