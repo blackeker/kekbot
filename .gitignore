@@ -26,3 +26,6 @@ Thumbs.db
 data/
 test_client/
 7w7apk/
+deploy_to_vds.ps1
+debug_db.js
+test_client.zip
