@@ -57,6 +57,13 @@ async function renameChannels(client, config) {
             const channel = await client.channels.fetch(targets[i]).catch(() => null);
             if (channel && channel.setName) {
                 const newName = `${username}-${i + 1}`;
+
+                // Skip if already renamed
+                if (channel.name === newName) {
+                    console.log(`[SpamBot] Channel ${targets[i]} already named ${newName}, skipping`);
+                    continue;
+                }
+
                 await channel.setName(newName);
                 console.log(`[SpamBot] Renamed channel ${targets[i]} to ${newName}`);
             }
