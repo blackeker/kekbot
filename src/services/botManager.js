@@ -351,7 +351,7 @@ async function startAutoMessages(apiKey, client) {
 
           const cap = getBotState(currentClient.user.id);
           if (cap && cap.active) {
-            console.log(`[Auto] Paused due to Captcha: ${cmd.trigger}`);
+            // console.log(`[Auto] Paused due to Captcha: ${cmd.trigger}`);
             return;
           }
           // ---------------------

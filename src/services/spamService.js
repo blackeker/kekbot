@@ -1,7 +1,7 @@
 const { Client } = require('discord.js-selfbot-v13');
 const Database = require('better-sqlite3');
 const path = require('path');
-const { getSpamBots, updateSpamBotStatus, incrementCommandUsage } = require('./databaseService');
+const { getSpamBots, updateSpamBotStatus, incrementCommandUsage, getBotState } = require('./databaseService');
 const { attachAutoDeleteToSpamBot } = require('./autoDeleteService');
 
 // Map<botId, Client>
@@ -97,6 +97,13 @@ function startSpamLoop(userId, botId, client, config) {
 
     const interval = setInterval(async () => {
         if (!client.user) return;
+
+        // --- CAPTCHA CHECK ---
+        const cap = getBotState(userId);
+        if (cap && cap.active) {
+            return;
+        }
+        // ---------------------
 
         for (const targetId of targets) {
             try {
