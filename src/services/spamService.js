@@ -148,7 +148,7 @@ module.exports = {
                     const channelId = channels[0];
                     const channel = await client.channels.fetch(channelId).catch(() => null);
                     if (channel) {
-                        await channel.send(`+potato ${targetUserId}`);
+                        await channel.send(`+potato <@${targetUserId}>`);
                         // Atomik olmayan sayac artisi ama Promise.all bekledigi icin sonuc tutarli olmayabilir.
                         // map icinde dis degiskeni guncelliyoruz.
                         // JS single thread oldugu icin race condition olmaz (await disinda).
