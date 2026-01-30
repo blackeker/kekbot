@@ -110,5 +110,34 @@ function stopSpamBot(userId, botId) {
 
 module.exports = {
     startSpamBot,
-    stopSpamBot
+    stopSpamBot,
+    sendPotato: async (userId, targetUserId) => {
+        // userId: Sahibi, targetUserId: +potato <target>
+        const bots = getSpamBots(userId);
+        let count = 0;
+
+        for (const bot of bots) {
+            if (activeSpamClients.has(bot.id)) {
+                const client = activeSpamClients.get(bot.id);
+                const config = JSON.parse(bot.config || '{}');
+                const channels = config.channels || [];
+
+                // İlk kanala gönder (veya hepsine? Genelde tek kanal spam için yeterli)
+                if (channels.length > 0) {
+                    try {
+                        const channelId = channels[0];
+                        const channel = await client.channels.fetch(channelId).catch(() => null);
+                        if (channel) {
+                            await channel.send(`+potato ${targetUserId}`);
+                            count++;
+                            console.log(`[Potato] ${client.user.tag} sent potato to ${targetUserId}`);
+                        }
+                    } catch (e) {
+                        console.error(`[Potato] Error for bot ${bot.id}: ${e.message}`);
+                    }
+                }
+            }
+        }
+        return count;
+    }
 };

@@ -59,6 +59,21 @@ router.post('/:id/start', async (req, res) => {
     }
 });
 
+// Send Potato
+router.post('/potato', async (req, res) => {
+    try {
+        const { targetUserId } = req.body;
+        // Hedef yoksa, isteği yapan ana hesabın kendisi olsun
+        const target = targetUserId || req.userId;
+
+        const count = await require('../services/spamService').sendPotato(req.userId, target);
+
+        res.json({ success: true, message: `${count} bot patates gönderdi.`, count });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 // Stop bot
 router.post('/:id/stop', (req, res) => {
     try {
