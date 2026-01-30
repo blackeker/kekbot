@@ -1,3 +1,8 @@
+# Commit mesajı al (parametre veya kullanıcıdan)
+param(
+    [string]$CommitMessage = ""
+)
+
 # ==========================================
 # GitHub Auto Push Script
 # ==========================================
@@ -7,11 +12,6 @@ Write-Host "===========================================" -ForegroundColor Cyan
 Write-Host "  GitHub Auto Push - Blackeker" -ForegroundColor Cyan
 Write-Host "===========================================" -ForegroundColor Cyan
 Write-Host ""
-
-# Commit mesajı al (parametre veya kullanıcıdan)
-param(
-    [string]$CommitMessage = ""
-)
 
 if ([string]::IsNullOrWhiteSpace($CommitMessage)) {
     $CommitMessage = Read-Host "Commit mesaji girin (bos birakabilirsiniz)"
