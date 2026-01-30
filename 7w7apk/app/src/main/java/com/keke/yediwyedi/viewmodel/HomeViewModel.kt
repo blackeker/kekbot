@@ -41,13 +41,23 @@ class HomeViewModel(application: android.app.Application) : androidx.lifecycle.A
         pollingJob?.cancel()
     }
 
+    private var previousReadyState = false
+
     fun checkStatus() {
         viewModelScope.launch {
             try {
                 val response = NetworkModule.api?.getStatus()
                 if (response != null && response.isSuccessful) {
                     val body = response.body()
-                    _isBotReady.value = body?.data?.isReady == true
+                    val isNowReady = body?.data?.isReady == true
+                    
+                    // Notification Logic: If bot was ready and now is not
+                    if (previousReadyState && !isNowReady) {
+                         com.keke.yediwyedi.utils.NotificationHelper.showOfflineNotification(getApplication())
+                    }
+                    previousReadyState = isNowReady
+
+                    _isBotReady.value = isNowReady
                     _botUsername.value = body?.data?.username
                     _botStats.value = body?.data?.stats
                     

@@ -135,3 +135,15 @@ data class SpamBotListResponse(
     val success: Boolean,
     val data: List<SpamBot>
 )
+
+data class SpamConfigInner(
+    val channels: List<String>,
+    val delay: Long,
+    val randomMessages: Boolean,
+    val targetType: String = "channel", // "channel" or "dm"
+    val messageType: String = "text"   // "text" or "gif"
+)
+
+data class SpamConfigRequest(
+    val config: SpamConfigInner
+)

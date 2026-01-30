@@ -37,6 +37,8 @@ class MainActivity : ComponentActivity() {
             }
         }
         
+        com.keke.yediwyedi.utils.NotificationHelper.createNotificationChannel(this)
+        
         // Start Background Service
         val serviceIntent = android.content.Intent(this, com.keke.yediwyedi.services.CaptchaPollService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

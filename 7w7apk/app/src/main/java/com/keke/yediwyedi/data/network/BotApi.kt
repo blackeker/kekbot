@@ -75,5 +75,5 @@ interface BotApi {
     suspend fun stopSpamBot(@Path("id") id: Int): Response<Unit>
 
     @POST("spam/{id}/config")
-    suspend fun updateSpamConfig(@Path("id") id: Int, @Body body: Map<String, Any>): Response<Unit>
+    suspend fun updateSpamConfig(@Path("id") id: Int, @Body body: SpamConfigRequest): Response<Unit>
 }

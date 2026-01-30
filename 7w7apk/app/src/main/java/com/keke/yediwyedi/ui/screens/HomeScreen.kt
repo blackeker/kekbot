@@ -236,7 +236,7 @@ fun HomeScreen(
                 )
                 DashboardCard(
                     title = "Spam Botları",
-                    icon = androidx.compose.material.icons.filled.Settings, // Placeholder, usually Warning is good but reusing available or fully qualified
+                    icon = Icons.Default.Settings, // Using Settings icon for now
                     color = Color(0xFFD32F2F),
                     modifier = Modifier.weight(1f),
                     onClick = { navController.navigate("spam") }

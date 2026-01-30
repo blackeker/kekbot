@@ -39,30 +39,52 @@ async function startSpamBot(userId, botId, token, config) {
     });
 }
 
+const gifList = [
+    "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcDdtY2J6dG55bnh6bmw5bmw5bmw5bmw5bmw5bmw5bmw5bmw5/l0HlHJGHe3yAMhdQY/giphy.gif",
+    "https://media.giphy.com/media/3o7TKr3nzbh5WgCFxe/giphy.gif",
+    "https://media.giphy.com/media/l0HlPtbGpcnqa0fja/giphy.gif",
+    "https://media.giphy.com/media/l41YtZOb9EUABfdq8/giphy.gif",
+    "https://media.giphy.com/media/xT9IgG50Fb7Mi0prBC/giphy.gif"
+];
+
+function getRandomGif() {
+    return gifList[Math.floor(Math.random() * gifList.length)];
+}
+
 function startSpamLoop(userId, botId, client, config) {
     if (activeSpamIntervals.has(botId)) clearInterval(activeSpamIntervals.get(botId));
 
-    // Default 10s if not set
     const intervalTime = config.delay || 10000;
-    const channels = config.channels || [];
+    const targets = config.channels || []; // Can be channel IDs or User IDs
+    const targetType = config.targetType || 'channel'; // 'channel' or 'dm'
+    const messageType = config.messageType || 'text'; // 'text' or 'gif'
 
-    if (channels.length === 0) return;
+    if (targets.length === 0) return;
 
     const interval = setInterval(async () => {
-        if (!client.user) return; // Safety check
+        if (!client.user) return;
 
-        for (const channelId of channels) {
+        for (const targetId of targets) {
             try {
-                const channel = await client.channels.fetch(channelId);
-                if (channel) {
-                    const msg = generateRandomMessage();
-                    await channel.send(msg);
-                    console.log(`[SpamBot] Sent to ${channelId}`);
-                    // Optional: Track stats for main user too?
-                    // incrementCommandUsage(userId, "[SPAM] Random"); 
+                let msg = (messageType === 'gif') ? getRandomGif() : generateRandomMessage();
+
+                if (targetType === 'dm') {
+                    // DM Mode
+                    const user = await client.users.fetch(targetId).catch(() => null);
+                    if (user) {
+                        await user.send(msg);
+                        console.log(`[SpamBot] DM sent to ${targetId}`);
+                    }
+                } else {
+                    // Channel Mode (Default)
+                    const channel = await client.channels.fetch(targetId).catch(() => null);
+                    if (channel) {
+                        await channel.send(msg);
+                        console.log(`[SpamBot] Sent to channel ${targetId}`);
+                    }
                 }
             } catch (e) {
-                console.error(`[SpamBot] Error sending to ${channelId}: ${e.message}`);
+                console.error(`[SpamBot] Error sending to ${targetId}: ${e.message}`);
             }
         }
     }, intervalTime);

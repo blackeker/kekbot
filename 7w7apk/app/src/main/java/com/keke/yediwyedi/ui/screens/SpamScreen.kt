@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -75,6 +76,26 @@ class SpamViewModel : ViewModel() {
             } catch (e: Exception) {}
         }
     }
+
+    fun updateBotConfig(id: Int, channels: List<String>, delay: Long, targetType: String, messageType: String) {
+        viewModelScope.launch {
+            try {
+                val req = com.keke.yediwyedi.data.network.SpamConfigRequest(
+                    config = com.keke.yediwyedi.data.network.SpamConfigInner(
+                        channels = channels,
+                        delay = delay,
+                        randomMessages = true,
+                        targetType = targetType,
+                        messageType = messageType
+                    )
+                )
+                NetworkModule.api?.updateSpamConfig(id, req)
+                fetchBots()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
 }
 
 @Composable
@@ -84,6 +105,8 @@ fun SpamScreen(viewModel: SpamViewModel = viewModel()) {
     }
 
     var showAddDialog by remember { mutableStateOf(false) }
+    var showConfigDialog by remember { mutableStateOf(false) }
+    var selectedBot by remember { mutableStateOf<SpamBot?>(null) }
 
     Column(
         modifier = Modifier
@@ -109,7 +132,14 @@ fun SpamScreen(viewModel: SpamViewModel = viewModel()) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(viewModel.bots) { bot ->
-                    SpamBotCard(bot, viewModel)
+                    SpamBotCard(
+                        bot, 
+                        viewModel, 
+                        onConfigClick = { 
+                            selectedBot = bot
+                            showConfigDialog = true
+                        }
+                    )
                 }
             }
         }
@@ -152,10 +182,72 @@ fun SpamScreen(viewModel: SpamViewModel = viewModel()) {
             }
         )
     }
+
+    if (showConfigDialog && selectedBot != null) {
+        var channelInput by remember { mutableStateOf("") }
+        var delayInput by remember { mutableStateOf("10000") }
+        var targetType by remember { mutableStateOf("channel") }
+        var messageType by remember { mutableStateOf("text") }
+        
+        AlertDialog(
+            onDismissRequest = { showConfigDialog = false },
+            title = { Text("Bot Ayarları (#${selectedBot!!.id})") },
+            text = {
+                Column {
+                    Text("Hedef Kanal/Kullanıcı ID (Virgülle ayırın)", color = Color.Gray, fontSize = 12.sp)
+                    OutlinedTextField(
+                        value = channelInput,
+                        onValueChange = { channelInput = it },
+                        label = { Text("ID Listesi") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = delayInput,
+                        onValueChange = { delayInput = it },
+                        label = { Text("Gecikme (ms)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Hedef Tipi:", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = targetType == "channel", onClick = { targetType = "channel" })
+                        Text("Kanal", modifier = Modifier.padding(end = 16.dp))
+                        RadioButton(selected = targetType == "dm", onClick = { targetType = "dm" })
+                        Text("DM (Kullanıcı)")
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Mesaj Tipi:", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = messageType == "text", onClick = { messageType = "text" })
+                        Text("Rastgele Yazı", modifier = Modifier.padding(end = 16.dp))
+                        RadioButton(selected = messageType == "gif", onClick = { messageType = "gif" })
+                        Text("Rastgele GIF")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val channels = channelInput.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                    val delay = delayInput.toLongOrNull() ?: 10000L
+                    viewModel.updateBotConfig(selectedBot!!.id, channels, delay, targetType, messageType)
+                    showConfigDialog = false
+                }) {
+                    Text("KAYDET")
+                }
+            }
+        )
+    }
 }
 
 @Composable
-fun SpamBotCard(bot: SpamBot, viewModel: SpamViewModel) {
+fun SpamBotCard(
+    bot: SpamBot, 
+    viewModel: SpamViewModel,
+    onConfigClick: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2A32)),
@@ -187,6 +279,10 @@ fun SpamBotCard(bot: SpamBot, viewModel: SpamViewModel) {
                 )
             }
             
+            IconButton(onClick = onConfigClick) {
+                Icon(Icons.Default.Settings, contentDescription = "Ayarlar", tint = Color.LightGray)
+            }
+
             IconButton(onClick = { viewModel.toggleBot(bot) }) {
                 Icon(
                     imageVector = Icons.Default.PlayArrow,

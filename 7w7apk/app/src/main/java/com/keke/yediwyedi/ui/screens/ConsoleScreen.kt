@@ -76,23 +76,46 @@ fun ConsoleScreen(navController: NavController) {
         }
     }
 
+    var selectedFilter by remember { mutableStateOf("ALL") }
+
+    val filteredLogs = remember(logs.size, selectedFilter) {
+        if (selectedFilter == "ALL") logs
+        else logs.filter { it.type == selectedFilter }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF0C0C0C)) // Terminal Black
     ) {
         // Header
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Color(0xFF1E1E1E))
-                .padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = { navController.popBackStack() }) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri", tint = Color.White)
+            Row(
+                modifier = Modifier.padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { navController.popBackStack() }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri", tint = Color.White)
+                }
+                Text("Canlı Konsol (Live)", color = Color.Green, fontFamily = FontFamily.Monospace, fontSize = 16.sp)
             }
-            Text("Canlı Konsol (Live)", color = Color.Green, fontFamily = FontFamily.Monospace, fontSize = 16.sp)
+            
+            // Filters
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip("Tümü", "ALL", selectedFilter) { selectedFilter = it }
+                FilterChip("Bilgi", "INFO", selectedFilter, Color(0xFF2196F3))
+                FilterChip("Hata", "ERROR", selectedFilter, Color(0xFFFF5252))
+                FilterChip("Uyarı", "WARN", selectedFilter, Color(0xFFFFD740))
+            }
         }
 
         if (isLoading && logs.isEmpty()) {
@@ -107,11 +130,33 @@ fun ConsoleScreen(navController: NavController) {
                     .padding(horizontal = 8.dp),
                 contentPadding = PaddingValues(vertical = 8.dp)
             ) {
-                items(logs) { log ->
+                items(filteredLogs) { log ->
                     LogItem(log)
                 }
             }
         }
+    }
+}
+
+@Composable
+fun FilterChip(
+    text: String, 
+    type: String, 
+    selectedFilter: String, 
+    color: Color = Color.Gray, 
+    onClick: (String) -> Unit = {}
+) {
+    val isSelected = selectedFilter == type
+    androidx.compose.material3.Button(
+        onClick = { onClick(type) },
+        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+            containerColor = if (isSelected) color.copy(alpha = 0.8f) else Color.Transparent
+        ),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) Color.White else color),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+        modifier = Modifier.height(32.dp)
+    ) {
+        Text(text, fontSize = 12.sp, color = if(isSelected) Color.White else color)
     }
 }
 

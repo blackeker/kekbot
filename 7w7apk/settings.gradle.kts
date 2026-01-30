@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "7w7"
+rootProject.name = "KekBot"
 include(":app")
  

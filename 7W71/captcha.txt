@@ -1,5 +1,0 @@
-<@1123893835773263934> complete the captcha using `+captcha [code]` to verify you are a human!
- `[IF YOU DON'T COMPLETE IT IN TIME YOU'LL GET BLACKLISTED]`
-
-```css
-STOP USING THIS COMMAND OR YOU WILL GET BLACKLISTED [WARN 2/6]```
