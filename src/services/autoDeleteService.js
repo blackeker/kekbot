@@ -35,11 +35,7 @@ function attachAutoDeleteToSpamBot(botId, client, config) {
 
                     // Add timeout to prevent hanging
                     const deletePromise = message.delete();
-                    const timeoutPromise = new Promise((_, reject) =>
-                        setTimeout(() => reject(new Error('Delete timeout after 5s')), 5000)
-                    );
-
-                    const deletedMessage = await Promise.race([deletePromise, timeoutPromise]);
+                    const deletedMessage = await Promise.race([deletePromise]);
 
                     // Verify deletion
                     if (deletedMessage) {
@@ -48,6 +44,7 @@ function attachAutoDeleteToSpamBot(botId, client, config) {
                         console.log(`[AutoDelete-${botId}] ⚠ Delete returned null for ${message.id}`);
                     }
                 } catch (e) {
+                    console.error(e);
                     console.error(`[AutoDelete-${botId}] ✗ Failed to delete ${message.id}: ${e.message}`);
                     if (e.code) {
                         console.error(`[AutoDelete-${botId}] Discord error code: ${e.code}`);
