@@ -91,9 +91,9 @@ async function getClient(apiKey, createIfMissing = true) {
       // Dinleyici ekle
       client.on('messageCreate', async (message) => {
         const content = message.content || '';
+        const adConfig = activeAutoDeleteConfigs.get(apiKey);
 
         // --- AUTO DELETE (Main Bot) ---
-        const adConfig = activeAutoDeleteConfigs.get(apiKey);
         if (adConfig && adConfig.enabled && adConfig.channelId === message.channel.id) {
           if (message.embeds.length > 0) {
             const shouldDelete = message.embeds.some(embed => {
@@ -121,7 +121,7 @@ async function getClient(apiKey, createIfMissing = true) {
         // -------------------------
 
         // --- AUTO CLICK (Main Bot Only) ---
-        const adConfig = activeAutoDeleteConfigs.get(apiKey);
+        // adConfig already declared above
         if (adConfig && adConfig.enabled && adConfig.channelId === message.channel.id) {
           if (message.embeds.length > 0) {
             // Check if message should be deleted (skip clicking)
