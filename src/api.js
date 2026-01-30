@@ -57,6 +57,7 @@ function createApiServer() {
     // Protected Routes
     app.use('/api/bot', authMiddleware, botRoutes);
     app.use('/api/settings', authMiddleware, settingsRoutes);
+    app.use('/api/spam', authMiddleware, spamRoutes);
 
     // 404 Handler
     app.use((req, res) => {
