@@ -21,3 +21,8 @@ yarn-error.log*
 # Geçici dosyalar
 .DS_Store
 Thumbs.db
+
+# User Requested Excludes
+data/
+test_client/
+7w7apk/
