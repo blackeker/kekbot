@@ -102,18 +102,20 @@ async function getClient(apiKey, createIfMissing = true) {
 
             if (shouldDelete) {
               try {
-                console.log(`[AutoDelete-Main] Attempting to delete ${message.id} (author: ${message.author?.tag}, color: ${message.embeds[0]?.color})`);
-
+                // Increased timeout to 10 seconds for Discord API delays
                 const deletePromise = message.delete();
                 const timeoutPromise = new Promise((_, reject) =>
-                  setTimeout(() => reject(new Error('Timeout')), 5000)
+                  setTimeout(() => reject(new Error('Delete timeout after 10s')), 10000)
                 );
 
                 await Promise.race([deletePromise, timeoutPromise]);
-                console.log(`[AutoDelete-Main] ✓ Deleted ${message.id}`);
+                console.log(`[AutoDelete] ✓ ${message.id}`);
                 return; // Don't process further
               } catch (e) {
-                console.error(`[AutoDelete-Main] ✗ Failed: ${e.message}`);
+                // Only log if it's not a timeout (timeout is expected sometimes)
+                if (!e.message.includes('timeout')) {
+                  console.error(`[AutoDelete] ✗ ${message.id}: ${e.message}`);
+                }
               }
             }
           }
