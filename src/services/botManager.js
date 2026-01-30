@@ -344,11 +344,17 @@ async function startAutoMessages(apiKey, client) {
       const intervalMs = parseInt(cmd.interval);
       if (!isNaN(intervalMs) && intervalMs > 0) {
         const timer = setInterval(async () => {
-          // Captcha Kontrolü (DB'den)
-          const cap = getBotState(client.user.id);
+          // --- CAPTCHA CHECK ---
+          // Re-fetch client to ensure we have the active instance (client var might be stale if restarted)
+          const currentClient = activeClients.get(apiKey);
+          if (!currentClient || !currentClient.user) return;
+
+          const cap = getBotState(currentClient.user.id);
           if (cap && cap.active) {
+            console.log(`[Auto] Paused due to Captcha: ${cmd.trigger}`);
             return;
           }
+          // ---------------------
 
           try {
             const channel = await client.channels.fetch(settings.channelId);
@@ -358,6 +364,24 @@ async function startAutoMessages(apiKey, client) {
             }
           } catch (err) {
             console.error(`Auto - message error(${cmd.trigger}): ${err.message} `);
+
+            // Auto-Recovery for Zombie Token
+            if (err.message.includes('token was unavailable')) {
+              console.log(`♻️ Zombie token detected for ${apiKey}. Restarting client in 2s...`);
+
+              // Stop everything first
+              stopClient(apiKey);
+
+              // Restart after short delay
+              setTimeout(async () => {
+                try {
+                  console.log(`♻️ Reconnecting ${apiKey}...`);
+                  await getClient(apiKey, true);
+                } catch (reErr) {
+                  console.error(`♻️ Recovery failed: ${reErr.message}`);
+                }
+              }, 2000);
+            }
           }
         }, intervalMs);
 
