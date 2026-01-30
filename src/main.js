@@ -24,7 +24,7 @@ info('🔐 Korumalı API uç noktaları hazır');
 // Start API Server
 try {
     createApiServer();
-
+    // Test
     // Restore active spam bots (independent from main bot)
     // Auto-delete also runs through spam bots
     const { restoreAllActiveSpamBots } = require('./services/spamService');
