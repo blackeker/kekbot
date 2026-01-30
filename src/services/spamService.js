@@ -167,3 +167,42 @@ module.exports = {
         return count;
     }
 };
+
+/**
+ * Uygulama başladığında tüm aktif spam botlarını otomatik başlatır
+ */
+async function restoreAllActiveSpamBots() {
+    try {
+        const Database = require('better-sqlite3');
+        const path = require('path');
+        const dbPath = path.resolve(__dirname, '../../data/users.db');
+        const db = new Database(dbPath);
+
+        // Tüm aktif spam botlarını getir
+        const activeBots = db.prepare('SELECT * FROM spam_bots WHERE is_active = 1').all();
+        db.close();
+
+        if (activeBots.length === 0) {
+            console.log('[SpamService] No active spam bots to restore');
+            return;
+        }
+
+        console.log(`[SpamService] Restoring ${activeBots.length} active spam bots...`);
+
+        for (const bot of activeBots) {
+            try {
+                const config = JSON.parse(bot.config || '{}');
+                await startSpamBot(bot.user_id, bot.id, bot.token, config);
+                console.log(`[SpamService] ✓ Restored spam bot ${bot.id}`);
+            } catch (e) {
+                console.error(`[SpamService] ✗ Failed to restore bot ${bot.id}: ${e.message}`);
+            }
+        }
+
+        console.log('[SpamService] All active spam bots restored');
+    } catch (e) {
+        console.error('[SpamService] Error restoring spam bots:', e.message);
+    }
+}
+
+module.exports.restoreAllActiveSpamBots = restoreAllActiveSpamBots;

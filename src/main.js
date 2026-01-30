@@ -24,6 +24,15 @@ info('🔐 Korumalı API uç noktaları hazır');
 // Start API Server
 try {
     createApiServer();
+
+    // Restore active spam bots (independent from main bot)
+    const { restoreAllActiveSpamBots } = require('./services/spamService');
+    setTimeout(() => {
+        restoreAllActiveSpamBots().catch(err => {
+            error(`Failed to restore spam bots: ${err.message}`);
+        });
+    }, 2000); // 2 saniye bekle (DB hazır olsun)
+
 } catch (err) {
     error(`❌ FATAL: API sunucusu başlatılamadı: ${err.message}`);
     process.exit(1);
