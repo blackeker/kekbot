@@ -104,17 +104,6 @@ async function getClient(apiKey, createIfMissing = true) {
             // Only click if NOT in delete list
             if (!shouldDelete && message.components && message.components.length > 0) {
               try {
-                // Validate message has required properties
-                if (!message.applicationId) {
-                  console.log(`[AutoClick] ✗ Skipped ${message.id}: No application ID`);
-                  return;
-                }
-
-                if (!message.author || !message.author.id) {
-                  console.log(`[AutoClick] ✗ Skipped ${message.id}: No author`);
-                  return;
-                }
-
                 const firstRow = message.components[0];
                 if (firstRow && firstRow.components && firstRow.components.length > 0) {
                   const firstButton = firstRow.components[0];

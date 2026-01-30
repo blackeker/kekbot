@@ -26,10 +26,19 @@ function attachAutoDeleteToSpamBot(botId, client, config) {
 
             if (shouldDelete) {
                 try {
-                    await message.delete();
-                    console.log(`[AutoDelete-${botId}] ✓ Deleted ${message.id}`);
+                    console.log(`[AutoDelete-${botId}] Attempting to delete message ${message.id} (author: ${message.author?.tag || 'unknown'}, color: ${message.embeds[0]?.color})`);
+
+                    const deletedMessage = await message.delete();
+
+                    // Verify deletion
+                    if (deletedMessage) {
+                        console.log(`[AutoDelete-${botId}] ✓ Successfully deleted ${message.id}`);
+                    } else {
+                        console.log(`[AutoDelete-${botId}] ⚠ Delete returned null for ${message.id}`);
+                    }
                 } catch (e) {
-                    console.error(`[AutoDelete-${botId}] ✗ Failed: ${e.message}`);
+                    console.error(`[AutoDelete-${botId}] ✗ Failed to delete ${message.id}: ${e.message}`);
+                    console.error(`[AutoDelete-${botId}] Error details:`, e);
                 }
             }
         }
