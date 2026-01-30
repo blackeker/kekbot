@@ -1,5 +1,5 @@
 const { Client } = require('discord.js-selfbot-v13');
-const { getUserByApiKey, getUserCommands, getUserSettings, saveBotStatus, incrementCommandUsage } = require('./databaseService');
+const { getUserByApiKey, getUserCommands, getUserSettings, saveBotStatus, getBotState, incrementCommandUsage } = require('./databaseService');
 
 const activeClients = new Map();
 // Anahtar: apiKey, Değer: Array<IntervalID>
