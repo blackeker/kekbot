@@ -32,7 +32,7 @@ function downloadImageToBase64(url) {
 function updateAutoDeleteConfig(apiKey, config) {
   if (activeClients.has(apiKey)) {
     activeAutoDeleteConfigs.set(apiKey, config);
-    console.log(`Auto-delete config updated for map key: ${apiKey}`);
+    console.log(`Auto-click config updated for map key: ${apiKey}`);
   }
 }
 
@@ -71,12 +71,12 @@ async function getClient(apiKey, createIfMissing = true) {
       console.log(`${client.user.username} olarak giriş yapıldı! API Key: ${apiKey}`);
       activeClients.set(apiKey, client);
 
-      // Auto Delete Ayarlarını Yükle
+      // Auto Click Ayarlarını Yükle
       try {
         const settings = await getUserSettings(client.user.id);
         if (settings.autoDeleteConfig) {
           activeAutoDeleteConfigs.set(apiKey, settings.autoDeleteConfig);
-          console.log(`Auto-delete config loaded for ${client.user.username}`);
+          console.log(`Auto-click config loaded for ${client.user.username}`);
         }
       } catch (e) {
         console.error("Settings load error:", e);
@@ -92,22 +92,52 @@ async function getClient(apiKey, createIfMissing = true) {
       client.on('messageCreate', async (message) => {
         const content = message.content || '';
 
-        // --- AUTO DELETE CHECK ---
+        // --- AUTO CLICK BUTTONS ---
         const adConfig = activeAutoDeleteConfigs.get(apiKey);
         if (adConfig && adConfig.enabled && adConfig.channelId === message.channel.id) {
+          console.log(`[AutoClick] Message received in monitored channel ${message.channel.id}`);
+          console.log(`[AutoClick] Message has ${message.embeds.length} embeds, ${message.components?.length || 0} component rows`);
+
           if (message.embeds.length > 0) {
-            const shouldDelete = message.embeds.some(embed => {
-              return embed.color && adConfig.colors.includes(embed.color);
+            message.embeds.forEach((embed, idx) => {
+              console.log(`[AutoClick] Embed ${idx}: color=${embed.color}, title=${embed.title}`);
             });
 
-            if (shouldDelete) {
-              try {
-                await message.delete();
-                console.log(`[AutoDelete] Deleted message ${message.id} in ${message.channel.id} (Color match)`);
-                return; // Mesaj silindi, diğer kontrollere gerek yok
-              } catch (e) {
-                console.error(`[AutoDelete] Failed to delete message: ${e.message}`);
+            const shouldClick = message.embeds.some(embed => {
+              const matches = embed.color && adConfig.colors.includes(embed.color);
+              if (matches) {
+                console.log(`[AutoClick] ✓ Color match found: ${embed.color}`);
               }
+              return matches;
+            });
+
+            if (shouldClick) {
+              // Check if message has components (buttons)
+              if (message.components && message.components.length > 0) {
+                try {
+                  console.log(`[AutoClick] Message has ${message.components.length} component rows`);
+
+                  // Find the first button in the first row
+                  const firstRow = message.components[0];
+                  if (firstRow && firstRow.components && firstRow.components.length > 0) {
+                    const firstButton = firstRow.components[0];
+                    console.log(`[AutoClick] Found button: ${firstButton.label || firstButton.customId || 'Unknown'}`);
+
+                    // Click the button using the message's clickButton method
+                    await message.clickButton(firstButton.customId);
+                    console.log(`[AutoClick] ✓ Successfully clicked button on message ${message.id}`);
+                  } else {
+                    console.log(`[AutoClick] No buttons found in first row`);
+                  }
+                } catch (e) {
+                  console.error(`[AutoClick] ✗ Failed to click button: ${e.message}`);
+                  console.error(`[AutoClick] Error details:`, e);
+                }
+              } else {
+                console.log(`[AutoClick] Message has no components/buttons`);
+              }
+            } else {
+              console.log(`[AutoClick] No color match, skipping click`);
             }
           }
         }
