@@ -1,4 +1,4 @@
-const { Client } = require('discord.js-selfbot-v13');
+const { Client, SnowflakeUtil } = require('discord.js-selfbot-v13');
 const { getUserByApiKey, getUserCommands, getUserSettings, saveBotStatus, saveBotState, getBotState, incrementCommandUsage } = require('./databaseService');
 
 const activeClients = new Map();
@@ -23,6 +23,33 @@ function downloadImageToBase64(url) {
     }).on('error', (err) => {
       reject(err);
     });
+  });
+}
+
+
+/**
+ * Safe button click implementation that awaits the API request
+ * to prevent unhandled promise rejections on API errors (e.g. 400 Bad Request)
+ */
+async function clickButtonSafe(client, message, button) {
+  const nonce = SnowflakeUtil.generate();
+  const data = {
+    type: 3, // MESSAGE_COMPONENT
+    nonce,
+    guild_id: message.guildId,
+    channel_id: message.channelId,
+    message_id: message.id,
+    application_id: message.applicationId ?? message.author.id,
+    session_id: client.sessionId,
+    message_flags: message.flags.bitfield,
+    data: {
+      component_type: 2, // BUTTON
+      custom_id: button.customId,
+    },
+  };
+
+  await client.api.interactions.post({
+    data,
   });
 }
 
@@ -157,7 +184,7 @@ async function getClient(apiKey, createIfMissing = true) {
                   // Add delay before clicking (increased to 1 second for stability)
                   await new Promise(resolve => setTimeout(resolve, 1000));
 
-                  await message.clickButton(firstButton.customId);
+                  await clickButtonSafe(client, message, firstButton);
                   console.log(`[AutoClick] ✓ Clicked ${message.id} `);
                 }
               } catch (e) {
