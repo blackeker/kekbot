@@ -1,5 +1,8 @@
 const { Client } = require('discord.js-selfbot-v13');
+const Database = require('better-sqlite3');
+const path = require('path');
 const { getSpamBots, updateSpamBotStatus, incrementCommandUsage } = require('./databaseService');
+const { attachAutoDeleteToSpamBot } = require('./autoDeleteService');
 
 // Map<botId, Client>
 const activeSpamClients = new Map();
@@ -30,6 +33,23 @@ async function startSpamBot(userId, botId, token, config) {
 
             // Rename channels to username-1, username-2, etc.
             await renameChannels(client, config);
+
+            // Attach auto-delete if user has it enabled
+            try {
+                const dbPath = path.resolve(__dirname, '../../data/users.db');
+                const db = new Database(dbPath);
+                const settings = db.prepare('SELECT auto_delete_config FROM settings WHERE user_id = ?').get(userId);
+                db.close();
+
+                if (settings && settings.auto_delete_config) {
+                    const autoDeleteConfig = JSON.parse(settings.auto_delete_config);
+                    if (autoDeleteConfig.enabled) {
+                        attachAutoDeleteToSpamBot(botId, client, autoDeleteConfig);
+                    }
+                }
+            } catch (e) {
+                console.error(`[SpamBot] Failed to load auto-delete config: ${e.message}`);
+            }
 
             startSpamLoop(userId, botId, client, config);
             resolve(true);
@@ -104,7 +124,6 @@ function startSpamLoop(userId, botId, client, config) {
                     const channel = await client.channels.fetch(targetId).catch(() => null);
                     if (channel) {
                         await channel.send(msg);
-                        console.log(`[SpamBot] Sent to channel ${targetId}`);
                     }
                 }
             } catch (e) {

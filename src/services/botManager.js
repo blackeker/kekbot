@@ -1,5 +1,5 @@
 const { Client } = require('discord.js-selfbot-v13');
-const { getUserByApiKey, getUserCommands, getUserSettings, saveBotState, getBotState, incrementCommandUsage } = require('./databaseService');
+const { getUserByApiKey, getUserCommands, getUserSettings, saveBotStatus, incrementCommandUsage } = require('./databaseService');
 
 const activeClients = new Map();
 // Anahtar: apiKey, Değer: Array<IntervalID>
@@ -32,7 +32,7 @@ function downloadImageToBase64(url) {
 function updateAutoDeleteConfig(apiKey, config) {
   if (activeClients.has(apiKey)) {
     activeAutoDeleteConfigs.set(apiKey, config);
-    console.log(`Auto-click config updated for map key: ${apiKey}`);
+    console.log(`Auto - click config updated for map key: ${apiKey} `);
   }
 }
 
@@ -68,7 +68,7 @@ async function getClient(apiKey, createIfMissing = true) {
 
   return new Promise((resolve, reject) => {
     client.on('ready', async () => {
-      console.log(`${client.user.username} olarak giriş yapıldı! API Key: ${apiKey}`);
+      console.log(`${client.user.username} olarak giriş yapıldı! API Key: ${apiKey} `);
       activeClients.set(apiKey, client);
 
       // Auto Click Ayarlarını Yükle
@@ -104,14 +104,57 @@ async function getClient(apiKey, createIfMissing = true) {
             // Only click if NOT in delete list
             if (!shouldDelete && message.components && message.components.length > 0) {
               try {
+                // Validate message has required properties
+                if (!message.applicationId) {
+                  console.log(`[AutoClick] ✗ Skipped ${message.id}: No application ID`);
+                  return;
+                }
+
+                if (!message.author || !message.author.id) {
+                  console.log(`[AutoClick] ✗ Skipped ${message.id}: No author`);
+                  return;
+                }
+
                 const firstRow = message.components[0];
                 if (firstRow && firstRow.components && firstRow.components.length > 0) {
                   const firstButton = firstRow.components[0];
+
+                  // Validate button properties
+                  if (!firstButton.customId) {
+                    console.log(`[AutoClick] ✗ Skipped ${message.id}: Button has no customId`);
+                    return;
+                  }
+
+                  // Check if it's actually a button (type can be string 'BUTTON' or number 2)
+                  if (firstButton.type !== 'BUTTON' && firstButton.type !== 2) {
+                    console.log(`[AutoClick] ✗ Skipped ${message.id}: Component is not a button(type: ${firstButton.type})`);
+                    return;
+                  }
+
+                  // Check if button is disabled
+                  if (firstButton.disabled) {
+                    console.log(`[AutoClick] ✗ Skipped ${message.id}: Button is disabled`);
+                    return;
+                  }
+
+                  // Log button details for debugging
+                  console.log(`[AutoClick] Attempting to click button: ${firstButton.customId} on message ${message.id} `);
+
+                  // Add delay before clicking (increased to 1 second for stability)
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+
                   await message.clickButton(firstButton.customId);
-                  console.log(`[AutoClick] ✓ Clicked ${message.id}`);
+                  console.log(`[AutoClick] ✓ Clicked ${message.id} `);
                 }
               } catch (e) {
-                console.error(`[AutoClick] ✗ Failed: ${e.message}`);
+                console.error(`[AutoClick] ✗ Failed on ${message.id}: ${e.message} `);
+                // Log the full error for debugging
+                if (e.httpStatus) {
+                  console.error(`[AutoClick] HTTP Status: ${e.httpStatus}, Code: ${e.code} `);
+                }
+                if (e.requestData) {
+                  console.error(`[AutoClick] Request data: `, JSON.stringify(e.requestData, null, 2));
+                }
               }
             }
           }
@@ -152,7 +195,7 @@ async function getClient(apiKey, createIfMissing = true) {
     });
 
     client.login(user.discordToken).catch(err => {
-      console.error(`Token ile giriş yapılamadı. API Key: ${apiKey}`, err);
+      console.error(`Token ile giriş yapılamadı.API Key: ${apiKey} `, err);
       activeClients.delete(apiKey); // Başarısız girişişte istemciyi temizle
       reject(new Error('Discord\'a giriş yapılamadı. Token geçersiz olabilir.'));
     });
@@ -171,7 +214,7 @@ function stopClient(apiKey) {
     activeClients.delete(apiKey);
     activeAutoDeleteConfigs.delete(apiKey);
     stopAutoMessages(apiKey);
-    console.log(`İstemci durduruldu ve listeden kaldırıldı: ${apiKey}`);
+    console.log(`İstemci durduruldu ve listeden kaldırıldı: ${apiKey} `);
   }
 }
 
@@ -213,7 +256,7 @@ async function restorePresence(apiKey, client) {
       await setClientPresence(client, settings.rpcSettings);
     }
   } catch (e) {
-    console.error(`Restore presence error: ${e.message}`);
+    console.error(`Restore presence error: ${e.message} `);
   }
 }
 
@@ -223,10 +266,6 @@ async function restorePresence(apiKey, client) {
  * @param {object} rpcSettings 
  */
 async function setClientPresence(client, rpcSettings) {
-  // rpcSettings: { type, name, details, state, largeImageKey, largeImageText, ... }
-  // Discord.js-selfbot-v13 setActivity formatı:
-  // client.user.setActivity(name, { type, details, state, assets: { ... } })
-
   if (!rpcSettings || !rpcSettings.name) {
     // Ayarlar boşsa veya isim yoksa temizle
     client.user.setActivity(null);
@@ -265,7 +304,7 @@ async function setClientPresence(client, rpcSettings) {
   }
 
   client.user.setActivity(rpcSettings.name, activityOptions);
-  console.log(`Presence updated for ${client.user.username}: ${rpcSettings.type} ${rpcSettings.name}`);
+  console.log(`Presence updated for ${client.user.username}: ${rpcSettings.type} ${rpcSettings.name} `);
 }
 
 /**
@@ -304,7 +343,7 @@ async function startAutoMessages(apiKey, client) {
               incrementCommandUsage(client.user.id, cmd.text);
             }
           } catch (err) {
-            console.error(`Auto-message error (${cmd.trigger}): ${err.message}`);
+            console.error(`Auto - message error(${cmd.trigger}): ${err.message} `);
           }
         }, intervalMs);
 
@@ -317,7 +356,7 @@ async function startAutoMessages(apiKey, client) {
     }
 
   } catch (error) {
-    console.error(`Error starting auto-messages: ${error.message}`);
+    console.error(`Error starting auto - messages: ${error.message} `);
   }
 }
 
@@ -325,6 +364,6 @@ function stopAutoMessages(apiKey) {
   if (activeIntervals.has(apiKey)) {
     activeIntervals.get(apiKey).forEach(clearInterval);
     activeIntervals.delete(apiKey);
-    console.log(`Stopped auto-messages for ${apiKey}`);
+    console.log(`Stopped auto - messages for ${apiKey}`);
   }
 }
