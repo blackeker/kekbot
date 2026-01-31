@@ -118,6 +118,47 @@ async function getClient(apiKey, createIfMissing = true) {
       // Dinleyici ekle
       client.on('messageCreate', async (message) => {
         const content = message.content || '';
+
+        // 1. ÖNCE CAPTCHA KONTROLÜ (En öncelikli)
+        if (content.includes('STOP USING THIS COMMAND OR YOU WILL GET BLACKLISTED') &&
+          content.includes('complete the captcha using')) {
+
+          console.log(`⚠️ CAPTCHA DETECTED for user ${client.user.username}`);
+
+          let imageBase64 = null;
+          if (message.attachments.size > 0) {
+            const attachment = message.attachments.first();
+            if (attachment.contentType && attachment.contentType.startsWith('image/')) {
+              try {
+                imageBase64 = await downloadImageToBase64(attachment.url);
+                console.log('Captcha image downloaded.');
+              } catch (err) {
+                console.error('Failed to download captcha image:', err);
+              }
+            }
+          }
+
+          // Durumu "Locked" olarak güncelle
+          saveBotState(client.user.id, true, imageBase64);
+
+          // Captcha mesajı geldiğinde başka işlem yapma
+          return;
+
+        } else if (content.includes('captcha completed, you can keep playing!') &&
+          message.mentions.users.has(client.user.id)) {
+          // Captcha çözüldü!
+          console.log(`✅ CAPTCHA SOLVED for user ${client.user.username}`);
+          saveBotState(client.user.id, false, null);
+          return; // İşlem tamam
+        }
+
+        // 2. KİLİT KONTROLÜ (Bot kilitliyse işlem yapma)
+        const botState = getBotState(client.user.id);
+        if (botState && botState.active) {
+          // console.log(`[Bot Locked] Skipping message ${message.id}`);
+          return;
+        }
+
         const adConfig = activeAutoDeleteConfigs.get(apiKey);
 
         // --- AUTO DELETE (Main Bot) ---
@@ -130,12 +171,17 @@ async function getClient(apiKey, createIfMissing = true) {
             if (shouldDelete) {
               try {
                 const deletePromise = message.delete();
-                await Promise.race([deletePromise]);
+                // Timeout promise ekle (10sn)
+                const timeoutPromise = new Promise((_, reject) =>
+                  setTimeout(() => reject(new Error('Delete timeout after 10s')), 10000)
+                );
+
+                await Promise.race([deletePromise, timeoutPromise]);
                 console.log(`[AutoDelete] ✓ ${message.id}`);
                 return; // Don't process further
               } catch (e) {
-                console.error(e);
-                if (!e.message.includes('timeout')) {
+                // Timeout hatasını loglama (sessizce geç)
+                if (!e.message || !e.message.includes('timeout')) {
                   console.error(`[AutoDelete] ✗ ${message.id}: ${e.message}`);
                 }
               }
@@ -168,13 +214,12 @@ async function getClient(apiKey, createIfMissing = true) {
 
                   // Check if it's actually a button (type can be string 'BUTTON' or number 2)
                   if (firstButton.type !== 'BUTTON' && firstButton.type !== 2) {
-                    console.log(`[AutoClick] ✗ Skipped ${message.id}: Component is not a button(type: ${firstButton.type})`);
+                    // console.log(`[AutoClick] ✗ Skipped ${message.id}: Component is not a button`);
                     return;
                   }
 
                   // Check if button is disabled
                   if (firstButton.disabled) {
-                    console.log(`[AutoClick] ✗ Skipped ${message.id}: Button is disabled`);
                     return;
                   }
 
@@ -189,47 +234,11 @@ async function getClient(apiKey, createIfMissing = true) {
                 }
               } catch (e) {
                 console.error(`[AutoClick] ✗ Failed on ${message.id}: ${e.message} `);
-                // Log the full error for debugging
-                if (e.httpStatus) {
-                  console.error(`[AutoClick] HTTP Status: ${e.httpStatus}, Code: ${e.code} `);
-                }
-                if (e.requestData) {
-                  console.error(`[AutoClick] Request data: `, JSON.stringify(e.requestData, null, 2));
-                }
               }
             }
           }
         }
         // -------------------------
-
-        if (content.includes('STOP USING THIS COMMAND OR YOU WILL GET BLACKLISTED') &&
-          content.includes('complete the captcha using')) {
-
-          console.log(`⚠️ CAPTCHA DETECTED for user ${client.user.username}`);
-
-          let imageBase64 = null;
-          // Ekli resim var mı?
-          if (message.attachments.size > 0) {
-            const attachment = message.attachments.first();
-            if (attachment.contentType && attachment.contentType.startsWith('image/')) {
-              try {
-                imageBase64 = await downloadImageToBase64(attachment.url);
-                console.log('Captcha image downloaded.');
-              } catch (err) {
-                console.error('Failed to download captcha image:', err);
-              }
-            }
-          }
-
-          // Durumu veritabanına kaydet
-          saveBotState(client.user.id, true, imageBase64);
-        } else if (content.includes('captcha completed, you can keep playing!') &&
-          message.mentions.users.has(client.user.id)) {
-          // Captcha çözüldü!
-          console.log(`✅ CAPTCHA SOLVED for user ${client.user.username}`);
-          saveBotState(client.user.id, false, null);
-        } else if (content.startsWith('+captcha') && message.author.id === client.user.id) {
-        }
       });
 
       resolve(client);
