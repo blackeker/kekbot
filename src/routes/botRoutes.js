@@ -319,7 +319,7 @@ router.delete('/commands/:index', async (req, res) => {
 // Toggle specific automation features
 router.post('/features', async (req, res) => {
     try {
-        const apiKey = req.headers['x-api-key'];
+        const apiKey = req.headers.authorization || req.headers['x-api-key'];
         const { click, messages } = req.body; // Expect booleans, can be null/undefined if not changing
 
         // We need to merge with existing state, setAutomationFeatures handles this merge logic roughly
