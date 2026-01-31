@@ -102,10 +102,10 @@ router.post('/stop', (req, res) => {
             return res.json({ success: true, message: 'Bot zaten kapalı.' });
         }
         stopAutomation(apiKey); // Stops click/messages, keeps client alive for Auto-Delete
-        stopAllSpamBotsForUser(req.userId); // Stops spam bots completely
+        // stopAllSpamBotsForUser(req.userId); // Removed per user request: Spam bots stay active
 
-        info(`Bot automation paused (Auto-Delete active): ${req.discordClient.user.username}`);
-        res.json({ success: true, message: 'Bot otomasyonu durduruldu (Otomatik silme aktif).' });
+        info(`Bot automation paused (Auto-Delete & Spam Bots active): ${req.discordClient.user.username}`);
+        res.json({ success: true, message: 'Bot otomasyonu durduruldu (Otomatik silme ve Spam Botlar aktif).' });
     } catch (e) {
         error(`Error stopping bot: ${e.message}`);
         res.status(500).json({ success: false, error: 'Bot durdurulurken hata.' });

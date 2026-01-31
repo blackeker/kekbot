@@ -408,8 +408,10 @@ async function startAutoMessages(apiKey, client) {
       const intervalMs = parseInt(cmd.interval);
       if (!isNaN(intervalMs) && intervalMs > 0) {
         const timer = setInterval(async () => {
-          // --- CAPTCHA CHECK ---
-          // Re-fetch client to ensure we have the active instance (client var might be stale if restarted)
+          if (automationStates.get(apiKey) === false) {
+            return;
+          }
+
           const currentClient = activeClients.get(apiKey);
           if (!currentClient || !currentClient.user) return;
 
