@@ -69,20 +69,16 @@ async function getClient(apiKey, createIfMissing = true) {
     // Re-enable automation if it was paused (Resume all)
     automationStates.set(apiKey, { click: true, messages: true });
     // Ensure auto messages are running
-    const client = activeClients.get(apiKey);
-    await startAutoMessages(apiKey, client);
-    return client;
+    const existingClient = activeClients.get(apiKey);
+    await startAutoMessages(apiKey, existingClient);
+    return existingClient;
   }
 
   if (!createIfMissing) {
     return null;
   }
 
-  // ... (lines 91-106)
-  activeClients.set(apiKey, client);
-  automationStates.set(apiKey, { click: true, messages: true });
 
-  // ... 
 
 
 
@@ -102,7 +98,7 @@ async function getClient(apiKey, createIfMissing = true) {
     client.on('ready', async () => {
       console.log(`${client.user.username} olarak giriş yapıldı! API Key: ${apiKey} `);
       activeClients.set(apiKey, client);
-      automationStates.set(apiKey, true);
+      automationStates.set(apiKey, { click: true, messages: true });
 
       // Auto-Delete & Auto-Click Ayarlarını Yükle
       try {
