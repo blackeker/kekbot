@@ -84,32 +84,7 @@ async function getClient(apiKey, createIfMissing = true) {
 
   // ... 
 
-  /**
-   * Otomasyonu (Click: false, Messages: false) durdurur ama Client'ı açık tutar (Auto-Delete için).
-   */
-  function stopAutomation(apiKey) {
-    automationStates.set(apiKey, { click: false, messages: false });
-    // stopAutoMessages(apiKey); // StartAutoMessages loop check handles this now, but let's clear intervals to be safe/efficient
-    stopAutoMessages(apiKey);
-    console.log(`Bot otomasyonu durduruldu (Auto-Delete aktif devam ediyor): ${apiKey}`);
-  }
 
-  function setAutomationFeatures(apiKey, features) {
-    const current = automationStates.get(apiKey) || { click: false, messages: false };
-    const newState = { ...current, ...features };
-    automationStates.set(apiKey, newState);
-    const client = activeClients.get(apiKey);
-    if (client) {
-      if (newState.messages) {
-        startAutoMessages(apiKey, client);
-      } else {
-        stopAutoMessages(apiKey);
-      }
-    }
-
-    console.log(`Automation features updated for ${apiKey}: `, newState);
-    return newState;
-  }
 
   // 2. İstemci aktif değilse, veritabanından kullanıcıyı al
   const user = await getUserByApiKey(apiKey);
@@ -286,7 +261,45 @@ async function getClient(apiKey, createIfMissing = true) {
   });
 }
 
-// ... existing stopClient, stopAutomation ...
+function stopClient(apiKey) {
+  if (activeClients.has(apiKey)) {
+    const client = activeClients.get(apiKey);
+    client.destroy();
+    activeClients.delete(apiKey);
+    activeIntervals.get(apiKey)?.forEach(clearInterval);
+    activeIntervals.delete(apiKey);
+
+    // Configleri temizle
+    activeAutoDeleteConfigs.delete(apiKey);
+    // Automation state temizle
+    automationStates.delete(apiKey);
+
+    console.log(`Bot durduruldu: ${apiKey} `);
+  }
+}
+
+function stopAutomation(apiKey) {
+  automationStates.set(apiKey, { click: false, messages: false });
+  stopAutoMessages(apiKey);
+  console.log(`Bot otomasyonu durduruldu (Auto-Delete aktif devam ediyor): ${apiKey}`);
+}
+
+function setAutomationFeatures(apiKey, features) {
+  const current = automationStates.get(apiKey) || { click: false, messages: false };
+  const newState = { ...current, ...features };
+  automationStates.set(apiKey, newState);
+  const client = activeClients.get(apiKey);
+  if (client) {
+    if (newState.messages) {
+      startAutoMessages(apiKey, client);
+    } else {
+      stopAutoMessages(apiKey);
+    }
+  }
+
+  console.log(`Automation features updated for ${apiKey}: `, newState);
+  return newState;
+}
 
 // THIS PART RESTORES THE DAMAGED startAutoMessages FUNCTION
 async function startAutoMessages(apiKey, client) {
