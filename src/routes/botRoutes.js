@@ -5,7 +5,11 @@ const {
     updateUserCommand, patchUserCommand, deleteUserCommand,
     getUserSettings, getCommandStats
 } = require('../services/databaseService');
-const { stopClient, stopAutomation, getAutomationState, getCaptchaState, restartAutoMessages, getClient } = require('../services/botManager');
+const {
+    stopClient, stopAutomation, updateAutoDeleteConfig,
+    getAutomationState, getCaptchaState, restartAutoMessages,
+    getClient, setAutomationFeatures
+} = require('../services/botManager');
 const { stopAllSpamBotsForUser } = require('../services/spamService');
 const { info, error, getLogs } = require('../utils/logger');
 
@@ -64,7 +68,13 @@ router.get('/status', (req, res) => {
                 uptime: uptimeStr
             }
         },
-        automationEnabled: getAutomationState(req.headers.authorization || req.headers['x-api-key']),
+        automationEnabled: (function () {
+            const s = getAutomationState(req.headers.authorization || req.headers['x-api-key']);
+            // Return true if either is true, or if it was just boolean true? 
+            // getAutomationState returns object now.
+            return (s && (s.click || s.messages));
+        })(),
+        automationState: getAutomationState(req.headers.authorization || req.headers['x-api-key']),
         captchaState: getCaptchaState(req.headers.authorization || req.headers['x-api-key'])
     });
 });
@@ -303,6 +313,27 @@ router.delete('/commands/:index', async (req, res) => {
         res.json({ success: true, data: updated });
     } catch (e) {
         res.status(400).json({ success: false, error: e.message });
+    }
+});
+
+// Toggle specific automation features
+router.post('/features', async (req, res) => {
+    try {
+        const apiKey = req.headers['x-api-key'];
+        const { click, messages } = req.body; // Expect booleans, can be null/undefined if not changing
+
+        // We need to merge with existing state, setAutomationFeatures handles this merge logic roughly
+        // But let's pass an object with only defined keys
+        const featuresToUpdate = {};
+        if (typeof click === 'boolean') featuresToUpdate.click = click;
+        if (typeof messages === 'boolean') featuresToUpdate.messages = messages;
+
+        const newState = setAutomationFeatures(apiKey, featuresToUpdate);
+
+        res.json({ success: true, data: newState });
+    } catch (e) {
+        error(`Error updating features: ${e.message}`);
+        res.status(500).json({ success: false, error: e.message });
     }
 });
 
