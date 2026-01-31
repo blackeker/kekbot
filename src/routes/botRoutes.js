@@ -6,6 +6,7 @@ const {
     getUserSettings, getCommandStats
 } = require('../services/databaseService');
 const { stopClient, getCaptchaState, restartAutoMessages, getClient } = require('../services/botManager');
+const { stopAllSpamBotsForUser } = require('../services/spamService');
 const { info, error, getLogs } = require('../utils/logger');
 
 // Stats Endpoint
@@ -94,7 +95,8 @@ router.post('/stop', (req, res) => {
             return res.json({ success: true, message: 'Bot zaten kapalı.' });
         }
         stopClient(apiKey);
-        info(`Bot stopped: ${req.discordClient.user.username}`);
+        stopAllSpamBotsForUser(req.userId); // Also stop all spam bots
+        info(`Bot and spam bots stopped: ${req.discordClient.user.username}`);
         res.json({ success: true, message: 'Bot durduruldu.' });
     } catch (e) {
         error(`Error stopping bot: ${e.message}`);

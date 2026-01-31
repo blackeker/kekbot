@@ -148,9 +148,28 @@ function stopSpamBot(userId, botId) {
     console.log(`[SpamBot] Stopped ${botId}`);
 }
 
+function stopAllSpamBotsForUser(userId) {
+    try {
+        const bots = getSpamBots(userId);
+        let count = 0;
+        bots.forEach(bot => {
+            if (activeSpamClients.has(bot.id) || activeSpamIntervals.has(bot.id)) {
+                stopSpamBot(userId, bot.id);
+                count++;
+            }
+        });
+        if (count > 0) {
+            console.log(`[SpamService] Stopped ${count} spam bots for user ${userId}`);
+        }
+    } catch (e) {
+        console.error(`[SpamService] Error stopping all bots for ${userId}: ${e.message}`);
+    }
+}
+
 module.exports = {
     startSpamBot,
     stopSpamBot,
+    stopAllSpamBotsForUser,
     sendPotato: async (userId, targetUserId) => {
         // userId: Sahibi, targetUserId: +potato <target>
         const bots = getSpamBots(userId);
