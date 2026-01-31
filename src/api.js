@@ -16,6 +16,7 @@ const authRoutes = require('./routes/authRoutes');
 const botRoutes = require('./routes/botRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const spamRoutes = require('./routes/spamRoutes');
+const commandsRoutes = require('./routes/commandsRoutes');
 
 function createApiServer() {
     const app = express();
@@ -58,6 +59,7 @@ function createApiServer() {
     app.use('/api/bot', authMiddleware, botRoutes);
     app.use('/api/settings', authMiddleware, settingsRoutes);
     app.use('/api/spam', authMiddleware, spamRoutes);
+    app.use('/api/commands', authMiddleware, commandsRoutes);
 
     // 404 Handler
     app.use((req, res) => {

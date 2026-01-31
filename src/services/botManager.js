@@ -1,17 +1,21 @@
 const { Client, SnowflakeUtil } = require('discord.js-selfbot-v13');
 const { getUserByApiKey, getUserCommands, getUserSettings, saveBotStatus, saveBotState, getBotState, incrementCommandUsage } = require('./databaseService');
-
-const activeClients = new Map();
-// Anahtar: apiKey, Değer: Array<IntervalID>
-const activeIntervals = new Map();
-// Anahtar: apiKey, Değer: AutoDeleteConfig
-const activeAutoDeleteConfigs = new Map();
-// Anahtar: apiKey, Değer: Boolean (Automation Enabled)
-// Anahtar: apiKey, Değer: { click: boolean, messages: boolean }
-const automationStates = new Map();
-
-// Projede axios yoksa native https kullanırız.
 const https = require('https');
+
+// --- BotSession Class ---
+class BotSession {
+  constructor(apiKey, client) {
+    this.apiKey = apiKey;
+    this.client = client;
+    this.intervals = []; // Array of Interval IDs
+    this.autoDeleteConfig = {}; // AutoDeleteConfig object
+    this.automationState = { click: true, messages: true }; // Automation flags
+  }
+}
+
+const sessions = new Map(); // Key: apiKey, Value: BotSession
+
+// --- Helpers ---
 
 function downloadImageToBase64(url) {
   return new Promise((resolve, reject) => {
@@ -51,293 +55,270 @@ async function clickButtonSafe(client, message, button) {
   });
 }
 
+// --- Managers ---
+
 function updateAutoDeleteConfig(apiKey, config) {
-  if (activeClients.has(apiKey)) {
-    activeAutoDeleteConfigs.set(apiKey, config);
-    console.log(`Auto - click config updated for map key: ${apiKey} `);
+  const session = sessions.get(apiKey);
+  if (session) {
+    session.autoDeleteConfig = config;
+    console.log(`Auto - delete config updated for session: ${apiKey}`);
   }
 }
 
 /**
- * @param {string} apiKey Kullanıcının API anahtarı.
- * @param {boolean} createIfMissing İstemci yoksa oluşturulsun mu? (Varsayılan: true)
- * @returns {Promise<Client|null>} Kullanıcıya ait Discord istemci nesnesi veya null.
+ * @param {string} apiKey 
+ * @param {boolean} createIfMissing 
+ * @returns {Promise<Client|null>} 
  */
 async function getClient(apiKey, createIfMissing = true) {
-  // 1. İstemci zaten aktif mi diye kontrol et
-  if (activeClients.has(apiKey)) {
+  // 1. Check existing session
+  let session = sessions.get(apiKey);
+  if (session) {
     // Re-enable automation if it was paused (Resume all)
-    automationStates.set(apiKey, { click: true, messages: true });
+    session.automationState = { click: true, messages: true };
+
     // Ensure auto messages are running
-    const existingClient = activeClients.get(apiKey);
-    await startAutoMessages(apiKey, existingClient);
-    return existingClient;
+    await startAutoMessages(apiKey, session.client);
+    return session.client;
   }
 
   if (!createIfMissing) {
     return null;
   }
 
-
-
-
-
-  // 2. İstemci aktif değilse, veritabanından kullanıcıyı al
+  // 2. Get user from DB
   const user = await getUserByApiKey(apiKey);
-
   if (!user || !user.discordToken) {
     throw new Error('Geçersiz API anahtarı veya kullanıcı bulunamadı.');
   }
 
-  // 3. Yeni bir istemci oluştur ve giriş yap
+  // 3. Create new client
   const client = new Client({
-    checkUpdate: false, // Otomatik güncelleme kontrolünü kapatabiliriz
+    checkUpdate: false,
   });
 
   return new Promise((resolve, reject) => {
     client.on('ready', async () => {
-      console.log(`${client.user.username} olarak giriş yapıldı! API Key: ${apiKey} `);
-      activeClients.set(apiKey, client);
-      automationStates.set(apiKey, { click: true, messages: true });
+      console.log(`${client.user.username} olarak giriş yapıldı! API Key: ${apiKey}`);
 
-      // Auto-Delete & Auto-Click Ayarlarını Yükle
+      // Create Session
+      const newSession = new BotSession(apiKey, client);
+      sessions.set(apiKey, newSession);
+
+      // Load Settings
       try {
         const settings = await getUserSettings(client.user.id);
         if (settings.autoDeleteConfig) {
-          activeAutoDeleteConfigs.set(apiKey, settings.autoDeleteConfig);
-          console.log(`Auto-delete & auto-click config loaded for ${client.user.username}`);
+          newSession.autoDeleteConfig = settings.autoDeleteConfig;
+          console.log(`Auto-delete config loaded for ${client.user.username}`);
         }
       } catch (e) {
         console.error("Settings load error:", e);
       }
 
-      // Otomatik Mesajları Başlat
+      // Start Automations
       startAutoMessages(apiKey, client);
-
-      // RPC Ayarlarını Kontrol Et ve Başlat
       restorePresence(apiKey, client);
 
-      // Dinleyici ekle
-      client.on('messageCreate', async (message) => {
-        const content = message.content || '';
-
-        // 1. ÖNCE CAPTCHA KONTROLÜ (En öncelikli)
-        if (content.includes('STOP USING THIS COMMAND OR YOU WILL GET BLACKLISTED') &&
-          content.includes('complete the captcha using')) {
-
-          console.log(`⚠️ CAPTCHA DETECTED for user ${client.user.username}`);
-
-          let imageBase64 = null;
-          if (message.attachments.size > 0) {
-            const attachment = message.attachments.first();
-            if (attachment.contentType && attachment.contentType.startsWith('image/')) {
-              try {
-                imageBase64 = await downloadImageToBase64(attachment.url);
-                console.log('Captcha image downloaded.');
-              } catch (err) {
-                console.error('Failed to download captcha image:', err);
-              }
-            }
-          }
-
-          // Durumu "Locked" olarak güncelle
-          saveBotState(client.user.id, true, imageBase64);
-
-          // Captcha mesajı geldiğinde başka işlem yapma
-          return;
-
-        } else if (content.includes('captcha completed, you can keep playing!') &&
-          message.mentions.users.has(client.user.id)) {
-          // Captcha çözüldü!
-          console.log(`✅ CAPTCHA SOLVED for user ${client.user.username}`);
-          saveBotState(client.user.id, false, null);
-          return; // İşlem tamam
-        }
-
-        // 2. KİLİT KONTROLÜ (Bot kilitliyse işlem yapma)
-        const botState = getBotState(client.user.id);
-        if (botState && botState.active) {
-          // console.log(`[Bot Locked] Skipping message ${message.id}`);
-          return;
-        }
-
-        const adConfig = activeAutoDeleteConfigs.get(apiKey);
-
-        // --- AUTO DELETE (Main Bot) ---
-        if (adConfig && adConfig.enabled && adConfig.channelId === message.channel.id) {
-          if (message.embeds.length > 0) {
-            const shouldDelete = message.embeds.some(embed => {
-              return embed.color && adConfig.colors.includes(embed.color);
-            });
-
-            if (shouldDelete) {
-              try {
-                const deletePromise = message.delete();
-                // Timeout promise ekle (10sn)
-                const timeoutPromise = new Promise((_, reject) =>
-                  setTimeout(() => reject(new Error('Delete timeout after 10s')), 10000)
-                );
-
-                await Promise.race([deletePromise, timeoutPromise]);
-                console.log(`[AutoDelete] ✓ ${message.id}`);
-                return; // Don't process further
-              } catch (e) {
-                // Timeout hatasını loglama (sessizce geç)
-                if (!e.message || !e.message.includes('timeout')) {
-                  console.error(`[AutoDelete] ✗ ${message.id}: ${e.message}`);
-                }
-              }
-            }
-          }
-        }
-        // -------------------------
-
-        // --- AUTO CLICK (Main Bot Only) ---
-        // adConfig already declared above
-        const autoState = automationStates.get(apiKey);
-        const isClickEnabled = autoState && autoState.click !== false; // Default true if not set false
-
-        if (isClickEnabled && adConfig && adConfig.enabled && adConfig.channelId === message.channel.id) {
-          if (message.embeds.length > 0) {
-            // Check if message should be deleted (skip clicking)
-            const shouldDelete = message.embeds.some(embed => {
-              return embed.color && adConfig.colors.includes(embed.color);
-            });
-
-            // Only click if NOT in delete list
-            if (!shouldDelete && message.components && message.components.length > 0) {
-              try {
-                const firstRow = message.components[0];
-                if (firstRow && firstRow.components && firstRow.components.length > 0) {
-                  const firstButton = firstRow.components[0];
-
-                  // Validate button properties
-                  if (!firstButton.customId) {
-                    console.log(`[AutoClick] ✗ Skipped ${message.id}: Button has no customId`);
-                    return;
-                  }
-
-                  // Check if it's actually a button (type can be string 'BUTTON' or number 2)
-                  if (firstButton.type !== 'BUTTON' && firstButton.type !== 2) {
-                    // console.log(`[AutoClick] ✗ Skipped ${message.id}: Component is not a button`);
-                    return;
-                  }
-
-                  // Check if button is disabled
-                  if (firstButton.disabled) {
-                    return;
-                  }
-
-                  // Log button details for debugging
-                  console.log(`[AutoClick] Attempting to click button: ${firstButton.customId} on message ${message.id} `);
-
-                  // Add delay before clicking (increased to 1 second for stability)
-                  await new Promise(resolve => setTimeout(resolve, 1000));
-
-                  await clickButtonSafe(client, message, firstButton);
-                  console.log(`[AutoClick] ✓ Clicked ${message.id} `);
-                }
-              } catch (e) {
-                console.error(`[AutoClick] ✗ Failed on ${message.id}: ${e.message} `);
-              }
-            }
-          }
-        }
-        // -------------------------
-      });
+      // Event Listener
+      client.on('messageCreate', async (message) => handleMessage(message, apiKey));
 
       resolve(client);
     });
 
     client.login(user.discordToken).catch(err => {
-      console.error(`Token ile giriş yapılamadı.API Key: ${apiKey} `, err);
-      activeClients.delete(apiKey); // Başarısız girişişte istemciyi temizle
+      console.error(`Token ile giriş yapılamadı. API Key: ${apiKey}`, err);
+      sessions.delete(apiKey);
       reject(new Error('Discord\'a giriş yapılamadı. Token geçersiz olabilir.'));
     });
   });
 }
 
+async function handleMessage(message, apiKey) {
+  const session = sessions.get(apiKey);
+  if (!session) return;
+  const client = session.client;
+  const content = message.content || '';
+
+  // 1. CAPTCHA CHECK
+  if (content.includes('STOP USING THIS COMMAND OR YOU WILL GET BLACKLISTED') &&
+    content.includes('complete the captcha using')) {
+
+    console.log(`⚠️ CAPTCHA DETECTED for user ${client.user.username}`);
+
+    let imageBase64 = null;
+    if (message.attachments.size > 0) {
+      const attachment = message.attachments.first();
+      if (attachment.contentType && attachment.contentType.startsWith('image/')) {
+        try {
+          imageBase64 = await downloadImageToBase64(attachment.url);
+          console.log('Captcha image downloaded.');
+        } catch (err) {
+          console.error('Failed to download captcha image:', err);
+        }
+      }
+    }
+
+    saveBotState(client.user.id, true, imageBase64);
+    return;
+
+  } else if (content.includes('captcha completed, you can keep playing!') &&
+    message.mentions.users.has(client.user.id)) {
+    console.log(`✅ CAPTCHA SOLVED for user ${client.user.username}`);
+    saveBotState(client.user.id, false, null);
+    return;
+  }
+
+  // 2. LOCK CHECK
+  const botState = getBotState(client.user.id);
+  if (botState && botState.active) {
+    return;
+  }
+
+  const adConfig = session.autoDeleteConfig;
+
+  // --- AUTO DELETE ---
+  if (adConfig && adConfig.enabled && adConfig.channelId === message.channel.id) {
+    if (message.embeds.length > 0) {
+      const shouldDelete = message.embeds.some(embed => {
+        return embed.color && adConfig.colors.includes(embed.color);
+      });
+
+      if (shouldDelete) {
+        try {
+          // Safe delete with timeout
+          const deletePromise = message.delete();
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Delete timeout')), 10000)
+          );
+          await Promise.race([deletePromise, timeoutPromise]);
+          console.log(`[AutoDelete] ✓ ${message.id}`);
+          return; // Deleted, stop processing
+        } catch (e) {
+          if (!e.message || !e.message.includes('timeout')) {
+            console.error(`[AutoDelete] ✗ ${message.id}: ${e.message}`);
+          }
+        }
+      }
+    }
+  }
+
+  // --- AUTO CLICK ---
+  const isClickEnabled = session.automationState.click !== false;
+
+  if (isClickEnabled && adConfig && adConfig.enabled && adConfig.channelId === message.channel.id) {
+    if (message.embeds.length > 0) {
+      // Re-check delete criteria just in case (though should have returned above)
+      const shouldDelete = message.embeds.some(embed => {
+        return embed.color && adConfig.colors.includes(embed.color);
+      });
+
+      if (!shouldDelete && message.components && message.components.length > 0) {
+        try {
+          const firstRow = message.components[0];
+          if (firstRow && firstRow.components && firstRow.components.length > 0) {
+            const firstButton = firstRow.components[0];
+
+            if (!firstButton.customId) {
+              console.log(`[AutoClick] ✗ Skipped ${message.id}: Button has no customId`);
+              return;
+            }
+
+            if (firstButton.type !== 'BUTTON' && firstButton.type !== 2) return;
+            if (firstButton.disabled) return;
+
+            console.log(`[AutoClick] Clicking: ${firstButton.customId} on ${message.id}`);
+
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await clickButtonSafe(client, message, firstButton);
+            console.log(`[AutoClick] ✓ Clicked ${message.id}`);
+          }
+        } catch (e) {
+          console.error(`[AutoClick] ✗ Failed on ${message.id}: ${e.message}`);
+        }
+      }
+    }
+  }
+}
+
 function stopClient(apiKey) {
-  if (activeClients.has(apiKey)) {
-    const client = activeClients.get(apiKey);
-    client.destroy();
-    activeClients.delete(apiKey);
-    activeIntervals.get(apiKey)?.forEach(clearInterval);
-    activeIntervals.delete(apiKey);
+  const session = sessions.get(apiKey);
+  if (session) {
+    // Clear intervals
+    session.intervals.forEach(clearInterval);
+    session.intervals = [];
 
-    // Configleri temizle
-    activeAutoDeleteConfigs.delete(apiKey);
-    // Automation state temizle
-    automationStates.delete(apiKey);
+    // Destroy client
+    if (session.client) {
+      try {
+        session.client.destroy();
+      } catch (e) { console.error('Error destroying client:', e); }
+    }
 
-    console.log(`Bot durduruldu: ${apiKey} `);
+    sessions.delete(apiKey);
+    console.log(`Bot durduruldu: ${apiKey}`);
   }
 }
 
 function stopAutomation(apiKey) {
-  automationStates.set(apiKey, { click: false, messages: false });
-  stopAutoMessages(apiKey);
-  console.log(`Bot otomasyonu durduruldu (Auto-Delete aktif devam ediyor): ${apiKey}`);
+  const session = sessions.get(apiKey);
+  if (session) {
+    session.automationState = { click: false, messages: false };
+    stopAutoMessages(apiKey);
+    console.log(`Bot otomasyonu durduruldu (Auto-Delete aktif): ${apiKey}`);
+  }
 }
 
 function setAutomationFeatures(apiKey, features) {
-  const current = automationStates.get(apiKey) || { click: false, messages: false };
+  const session = sessions.get(apiKey);
+  if (!session) {
+    // If no session, logic implies we can't set features for a non-running bot here effectively
+    // but we return default or what was requested.
+    return { click: false, messages: false };
+  }
+
+  const current = session.automationState;
   const newState = { ...current, ...features };
-  automationStates.set(apiKey, newState);
-  const client = activeClients.get(apiKey);
-  if (client) {
-    if (newState.messages) {
-      startAutoMessages(apiKey, client);
-    } else {
-      stopAutoMessages(apiKey);
-    }
+  session.automationState = newState;
+
+  if (newState.messages) {
+    startAutoMessages(apiKey, session.client);
+  } else {
+    stopAutoMessages(apiKey);
   }
 
   console.log(`Automation features updated for ${apiKey}: `, newState);
   return newState;
 }
 
-// THIS PART RESTORES THE DAMAGED startAutoMessages FUNCTION
 async function startAutoMessages(apiKey, client) {
-  // Check if automation is strictly disabled (or messages specifically)
-  const state = automationStates.get(apiKey);
-  if (state && state.messages === false) {
-    console.log(`[AutoMessages] Skipped start for ${apiKey} (Messages Paused)`);
+  const session = sessions.get(apiKey);
+  if (!session) return;
+
+  if (session.automationState.messages === false) {
+    console.log(`[AutoMessages] Skipped for ${apiKey} (Messages Paused)`);
     return;
   }
 
-  // Önce eskileri temizle
-  stopAutoMessages(apiKey);
+  stopAutoMessages(apiKey); // Clear existing
 
   try {
     const settings = await getUserSettings(client.user.id);
     const commands = await getUserCommands(client.user.id);
 
-    if (!settings.channelId) {
-      return;
-    }
-
-    const intervals = [];
+    if (!settings.channelId) return;
 
     commands.forEach(cmd => {
       const intervalMs = parseInt(cmd.interval);
       if (!isNaN(intervalMs) && intervalMs > 0) {
         const timer = setInterval(async () => {
-          // --- AUTOMATION STATE CHECK ---
-          const loopState = automationStates.get(apiKey);
-          if (loopState && loopState.messages === false) {
-            return;
-          }
+          // Refetch session state inside interval
+          const currentSession = sessions.get(apiKey);
+          if (!currentSession || currentSession.automationState.messages === false) return;
 
-          // --- CAPTCHA CHECK ---
-          const currentClient = activeClients.get(apiKey);
-          if (!currentClient || !currentClient.user) return;
-
-          const cap = getBotState(currentClient.user.id);
-          if (cap && cap.active) {
-            return;
-          }
-          // ---------------------
+          // Captcha Check
+          const cap = getBotState(client.user.id);
+          if (cap && cap.active) return;
 
           try {
             const channel = await client.channels.fetch(settings.channelId);
@@ -346,47 +327,34 @@ async function startAutoMessages(apiKey, client) {
               incrementCommandUsage(client.user.id, cmd.text);
             }
           } catch (err) {
-            console.error(`Auto - message error(${cmd.trigger}): ${err.message} `);
-
-            // Auto-Recovery for Zombie Token
+            console.error(`Auto-message error (${cmd.trigger}): ${err.message}`);
+            // Recovery
             if (err.message.includes('token was unavailable')) {
-              console.log(`♻️ Zombie token detected for ${apiKey}. Restarting client in 2s...`);
+              console.log(`♻️ Zombie token inferred. Cycling ${apiKey}...`);
               stopClient(apiKey);
-              setTimeout(async () => {
-                try {
-                  console.log(`♻️ Reconnecting ${apiKey}...`);
-                  await getClient(apiKey, true);
-                } catch (reErr) {
-                  console.error(`♻️ Recovery failed: ${reErr.message}`);
-                }
-              }, 2000);
+              setTimeout(() => getClient(apiKey, true).catch(Boolean), 2000);
             }
           }
         }, intervalMs);
 
-        intervals.push(timer);
+        session.intervals.push(timer);
       }
     });
 
-    if (intervals.length > 0) {
-      activeIntervals.set(apiKey, intervals);
-    }
-
   } catch (error) {
-    console.error(`Error starting auto - messages: ${error.message} `);
+    console.error(`Error starting auto-messages: ${error.message}`);
   }
 }
 
 function stopAutoMessages(apiKey) {
-  if (activeIntervals.has(apiKey)) {
-    activeIntervals.get(apiKey).forEach(clearInterval);
-    activeIntervals.delete(apiKey);
+  const session = sessions.get(apiKey);
+  if (session && session.intervals.length > 0) {
+    session.intervals.forEach(clearInterval);
+    session.intervals = [];
   }
 }
 
-/**
- * Veritabanından RPC ayarlarını okuyup uygular.
- */
+// --- RPC ---
 async function restorePresence(apiKey, client) {
   try {
     const settings = await getUserSettings(client.user.id);
@@ -395,24 +363,18 @@ async function restorePresence(apiKey, client) {
       await setClientPresence(client, settings.rpcSettings);
     }
   } catch (e) {
-    console.error(`Restore presence error: ${e.message} `);
+    console.error(`Restore presence error: ${e.message}`);
   }
 }
 
-/**
- * Discord Client için aktiviteyi ayarlar.
- * @param {Client} client 
- * @param {object} rpcSettings 
- */
 async function setClientPresence(client, rpcSettings) {
   if (!rpcSettings || !rpcSettings.name) {
-    // Ayarlar boşsa veya isim yoksa temizle
     client.user.setActivity(null);
     return;
   }
 
   const activityOptions = {
-    type: rpcSettings.type || 'PLAYING', // PLAYING, STREAMING, LISTENING, WATCHING, COMPETING
+    type: rpcSettings.type || 'PLAYING',
   };
 
   if (rpcSettings.url && rpcSettings.type === 'STREAMING') {
@@ -425,7 +387,7 @@ async function setClientPresence(client, rpcSettings) {
   if (rpcSettings.largeImageKey || rpcSettings.smallImageKey) {
     activityOptions.assets = {};
     if (rpcSettings.largeImageKey) {
-      activityOptions.assets.large_image = rpcSettings.largeImageKey; // url veya key
+      activityOptions.assets.large_image = rpcSettings.largeImageKey;
       if (rpcSettings.largeImageText) activityOptions.assets.large_text = rpcSettings.largeImageText;
     }
     if (rpcSettings.smallImageKey) {
@@ -439,7 +401,7 @@ async function setClientPresence(client, rpcSettings) {
   }
 
   client.user.setActivity(rpcSettings.name, activityOptions);
-  console.log(`Presence updated for ${client.user.username}: ${rpcSettings.type} ${rpcSettings.name} `);
+  console.log(`Presence updated for ${client.user.username}`);
 }
 
 module.exports = {
@@ -449,26 +411,26 @@ module.exports = {
   setAutomationFeatures,
   updateAutoDeleteConfig,
   getAutomationState: (apiKey) => {
-    const s = automationStates.get(apiKey);
-    return s || { click: true, messages: true };
+    const s = sessions.get(apiKey);
+    return s ? s.automationState : { click: true, messages: true };
   },
   getCaptchaState: (apiKey) => {
-    const client = activeClients.get(apiKey);
-    if (client) {
-      return getBotState(client.user.id);
+    const s = sessions.get(apiKey);
+    if (s && s.client) {
+      return getBotState(s.client.user.id);
     }
     return { active: false, imageBase64: null };
   },
   restartAutoMessages: async (apiKey) => {
-    const client = activeClients.get(apiKey);
-    if (client) {
-      await startAutoMessages(apiKey, client);
+    const s = sessions.get(apiKey);
+    if (s && s.client) {
+      await startAutoMessages(apiKey, s.client);
     }
   },
   updatePresence: async (apiKey, rpcSettings) => {
-    const client = activeClients.get(apiKey);
-    if (!client) return;
-
-    await setClientPresence(client, rpcSettings);
+    const s = sessions.get(apiKey);
+    if (s && s.client) {
+      await setClientPresence(s.client, rpcSettings);
+    }
   }
 };

@@ -1,17 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const {
-    getUserCommands, saveUserCommands, addUserCommand,
-    updateUserCommand, patchUserCommand, deleteUserCommand,
-    getUserSettings, getCommandStats
+    getCommandStats
 } = require('../services/databaseService');
 const {
-    stopClient, stopAutomation, updateAutoDeleteConfig,
-    getAutomationState, getCaptchaState, restartAutoMessages,
+    stopAutomation,
+    getAutomationState, getCaptchaState,
     getClient, setAutomationFeatures
 } = require('../services/botManager');
-const { stopAllSpamBotsForUser } = require('../services/spamService');
 const { info, error, getLogs } = require('../utils/logger');
+const { getUserSettings } = require('../services/databaseService'); // Needed for captcha
 
 // Stats Endpoint
 router.get('/stats', (req, res) => {
@@ -37,6 +35,12 @@ router.get('/logs', (req, res) => {
 
 router.get('/status', (req, res) => {
     const client = req.discordClient;
+    const apiKey = req.apiKey;
+
+    // Automation Status
+    const autoState = getAutomationState(apiKey);
+    const capState = getCaptchaState(apiKey);
+
     if (!client || !client.user) {
         return res.json({
             success: true,
@@ -46,6 +50,8 @@ router.get('/status', (req, res) => {
                 isReady: false,
                 stats: null
             },
+            automationEnabled: false,
+            automationState: autoState,
             captchaState: { active: false, imageBase64: null }
         });
     }
@@ -68,24 +74,19 @@ router.get('/status', (req, res) => {
                 uptime: uptimeStr
             }
         },
-        automationEnabled: (function () {
-            const s = getAutomationState(req.headers.authorization || req.headers['x-api-key']);
-            // Return true if either is true, or if it was just boolean true? 
-            // getAutomationState returns object now.
-            return (s && (s.click || s.messages));
-        })(),
-        automationState: getAutomationState(req.headers.authorization || req.headers['x-api-key']),
-        captchaState: getCaptchaState(req.headers.authorization || req.headers['x-api-key'])
+        automationEnabled: autoState.click || autoState.messages, // Composite status
+        automationState: autoState,
+        captchaState: capState
     });
 });
 
 
 // Start
 router.post('/start', async (req, res) => {
-    const apiKey = req.headers.authorization || req.headers['x-api-key'];
+    const apiKey = req.apiKey;
+
     // Eğer zaten çalışıyorsa
     if (req.discordClient) {
-        // Resume automation if it was paused
         try {
             await getClient(apiKey);
             return res.json({ success: true, message: 'Bot zaten çalışıyor. (Otomasyon aktif edildi)' });
@@ -106,16 +107,14 @@ router.post('/start', async (req, res) => {
 
 // Stop
 router.post('/stop', (req, res) => {
-    const apiKey = req.headers.authorization || req.headers['x-api-key'];
+    const apiKey = req.apiKey;
     try {
         if (!req.discordClient) {
             return res.json({ success: true, message: 'Bot zaten kapalı.' });
         }
-        stopAutomation(apiKey); // Stops click/messages, keeps client alive for Auto-Delete
-        // stopAllSpamBotsForUser(req.userId); // Removed per user request: Spam bots stay active
-
-        info(`Bot automation paused (Auto-Delete & Spam Bots active): ${req.discordClient.user.username}`);
-        res.json({ success: true, message: 'Bot otomasyonu durduruldu (Otomatik silme ve Spam Botlar aktif).' });
+        stopAutomation(apiKey);
+        info(`Bot automation paused: ${req.discordClient.user.username}`);
+        res.json({ success: true, message: 'Bot otomasyonu durduruldu.' });
     } catch (e) {
         error(`Error stopping bot: ${e.message}`);
         res.status(500).json({ success: false, error: 'Bot durdurulurken hata.' });
@@ -126,19 +125,18 @@ router.post('/stop', (req, res) => {
 router.post('/send-message', async (req, res) => {
     const { channelId, message } = req.body;
     const client = req.discordClient;
+    const apiKey = req.apiKey;
 
     if (!client) {
-        return res.status(503).json({ success: false, error: 'Bot is not running. Please start it first.' });
+        return res.status(503).json({ success: false, error: 'Bot is not running.' });
     }
-
-    const apiKey = req.headers.authorization || req.headers['x-api-key'];
 
     // Captcha kontrolü
     const captcha = getCaptchaState(apiKey);
     if (captcha.active) {
         return res.status(423).json({
             success: false,
-            error: 'LOCKED: Captcha required. Solve it first.',
+            error: 'LOCKED: Captcha required.',
             captchaRequired: true
         });
     }
@@ -148,7 +146,7 @@ router.post('/send-message', async (req, res) => {
     try {
         const channel = await client.channels.fetch(channelId);
         if (!channel || typeof channel.send !== 'function') {
-            return res.status(400).json({ success: false, error: 'Invalid channel or cannot send.' });
+            return res.status(400).json({ success: false, error: 'Invalid channel.' });
         }
         await channel.send(message);
         info(`Message sent to ${channelId} by ${client.user.username}`);
@@ -170,7 +168,6 @@ router.post('/solve-captcha', async (req, res) => {
     if (!solution) return res.status(400).json({ success: false, error: 'Solution required.' });
 
     try {
-        // Kanalı ayarlardan al
         const settings = await getUserSettings(req.userId);
         if (!settings.channelId) {
             return res.status(400).json({ success: false, error: 'Ayarlarda Kanal ID ayarlanmamış.' });
@@ -184,7 +181,6 @@ router.post('/solve-captcha', async (req, res) => {
         await channel.send(`+captcha ${solution}`);
         info(`Captcha solution sent by ${client.user.username}`);
 
-        // Optimistic unlock? No, let the bot listener handle it.
         res.json({ success: true, message: 'Captcha çözümü gönderildi.' });
     } catch (e) {
         error(`Solve captcha error: ${e.message}`);
@@ -192,138 +188,12 @@ router.post('/solve-captcha', async (req, res) => {
     }
 });
 
-// Settings (Update)
-router.post('/settings', async (req, res) => {
-    try {
-        const userId = req.userId;
-        const { channelId, theme, gemSystemEnabled, gems, rpcEnabled, rpcSettings } = req.body;
-
-        const settings = {};
-        if (channelId !== undefined) settings.channelId = channelId;
-        if (theme !== undefined) settings.theme = theme;
-        if (typeof gemSystemEnabled === 'boolean') settings.gemSystemEnabled = gemSystemEnabled;
-        if (Array.isArray(gems)) settings.gems = gems;
-        if (typeof rpcEnabled === 'boolean') settings.rpcEnabled = rpcEnabled;
-        if (rpcSettings) settings.rpcSettings = rpcSettings;
-
-        if (rpcSettings) settings.rpcSettings = rpcSettings;
-
-        await saveUserSettings(userId, settings);
-        const current = await getUserSettings(userId);
-
-        // Settings değiştiği için (Channel ID olabilir) otomasyonu yenile
-        const apiKey = req.headers.authorization || req.headers['x-api-key'];
-        if (req.discordClient) {
-            await restartAutoMessages(apiKey);
-        }
-
-        info(`Settings updated for ${userId}`);
-        res.json({ success: true, message: 'Ayarlar güncellendi', data: current });
-    } catch (e) {
-        error(`Settings update error: ${e.message}`);
-        res.status(400).json({ success: false, error: e.message });
-    }
-});
-
-// Commands - GET
-router.get('/commands', async (req, res) => {
-    try {
-        const cmds = await getUserCommands(req.userId);
-        res.json({ success: true, data: cmds });
-    } catch (e) {
-        error(`Get commands error: ${e.message}`);
-        res.status(500).json({ success: false, error: e.message });
-    }
-});
-
-// Commands - POST (Bulk Update)
-router.post('/commands', async (req, res) => {
-    const { commands } = req.body;
-    if (!Array.isArray(commands)) return res.status(400).json({ success: false, error: 'commands array required' });
-
-    try {
-        await saveUserCommands(req.userId, commands);
-
-        // Komutlar değişti, otomasyonu yenile
-        const apiKey = req.headers.authorization || req.headers['x-api-key'];
-        if (req.discordClient) {
-            await restartAutoMessages(apiKey);
-        }
-
-        res.json({ success: true, data: commands });
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
-    }
-});
-
-// Commands - Add
-router.post('/commands/add', async (req, res) => {
-    const { command } = req.body;
-    if (!command || !command.text) return res.status(400).json({ success: false, error: 'Invalid command object' });
-    try {
-        const updated = await addUserCommand(req.userId, command);
-
-        // Yeni komut eklendi (interval olabilir), otomasyonu yenile
-        const apiKey = req.headers.authorization || req.headers['x-api-key'];
-        if (req.discordClient) {
-            await restartAutoMessages(apiKey);
-        }
-
-        res.json({ success: true, data: updated });
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
-    }
-});
-
-// Commands - Update/Delete/Patch by Index
-router.put('/commands/:index', async (req, res) => handleCommandUpdate(req, res, updateUserCommand));
-router.patch('/commands/:index', async (req, res) => handleCommandUpdate(req, res, patchUserCommand));
-
-async function handleCommandUpdate(req, res, fn) {
-    const idx = parseInt(req.params.index);
-    const data = req.body.command || req.body; // .command for full update, body for patch
-    if (isNaN(idx)) return res.status(400).json({ success: false, error: 'Invalid index' });
-    try {
-        const updated = await fn(req.userId, idx, data);
-
-        // Komut değişti, otomasyonu yenile
-        const apiKey = req.headers.authorization || req.headers['x-api-key'];
-        if (req.discordClient) {
-            await restartAutoMessages(apiKey);
-        }
-
-        res.json({ success: true, data: updated });
-    } catch (e) {
-        res.status(400).json({ success: false, error: e.message });
-    }
-}
-
-router.delete('/commands/:index', async (req, res) => {
-    const idx = parseInt(req.params.index);
-    if (isNaN(idx)) return res.status(400).json({ success: false, error: 'Invalid index' });
-    try {
-        const updated = await deleteUserCommand(req.userId, idx);
-
-        // Komut silindi, otomasyonu yenile
-        const apiKey = req.headers.authorization || req.headers['x-api-key'];
-        if (req.discordClient) {
-            await restartAutoMessages(apiKey);
-        }
-
-        res.json({ success: true, data: updated });
-    } catch (e) {
-        res.status(400).json({ success: false, error: e.message });
-    }
-});
-
 // Toggle specific automation features
 router.post('/features', async (req, res) => {
     try {
-        const apiKey = req.headers.authorization || req.headers['x-api-key'];
-        const { click, messages } = req.body; // Expect booleans, can be null/undefined if not changing
+        const apiKey = req.apiKey;
+        const { click, messages } = req.body;
 
-        // We need to merge with existing state, setAutomationFeatures handles this merge logic roughly
-        // But let's pass an object with only defined keys
         const featuresToUpdate = {};
         if (typeof click === 'boolean') featuresToUpdate.click = click;
         if (typeof messages === 'boolean') featuresToUpdate.messages = messages;

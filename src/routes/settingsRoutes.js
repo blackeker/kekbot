@@ -1,18 +1,62 @@
 const express = require('express');
 const router = express.Router();
 const { getUserSettings, saveUserSettings } = require('../services/databaseService');
-const { updatePresence, updateAutoDeleteConfig } = require('../services/botManager');
+const { updatePresence, updateAutoDeleteConfig, restartAutoMessages } = require('../services/botManager');
 const { updateAutoDeleteConfig: updateAutoDeleteService, startAutoDelete, stopAutoDelete } = require('../services/autoDeleteService');
 const { info, error } = require('../utils/logger');
+
+// Update Settings (Generic)
+router.post('/', async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { channelId, theme, gemSystemEnabled, gems, rpcEnabled, rpcSettings } = req.body;
+
+        const settings = {};
+        if (channelId !== undefined) settings.channelId = channelId;
+        if (theme !== undefined) settings.theme = theme;
+        if (typeof gemSystemEnabled === 'boolean') settings.gemSystemEnabled = gemSystemEnabled;
+        if (Array.isArray(gems)) settings.gems = gems;
+        if (typeof rpcEnabled === 'boolean') settings.rpcEnabled = rpcEnabled;
+        if (rpcSettings) settings.rpcSettings = rpcSettings;
+
+        // Save to DB
+        await saveUserSettings(userId, settings);
+
+        // Refresh Runtime
+        const apiKey = req.headers.authorization || req.headers['x-api-key'];
+
+        // 1. Restart Auto Messages (if channel changed)
+        if (req.discordClient) {
+            await restartAutoMessages(apiKey);
+        }
+
+        // Wait, I need restartAutoMessages. It is not currently imported in settingsRoutes.
+        // I will add the import in a separate edit or include it here if I can replace imports.
+        // It's safer to add imports at top first. I'll do this in two steps or simply assume I will add imports in next step.
+        // Actually I can invoke `restartAutoMessages` if I import it.
+
+        // I'll return success and handle imports separately or check context. 
+        // Existing imports line 4: `const { updatePresence, updateAutoDeleteConfig } = require('../services/botManager');`
+        // I need to add `restartAutoMessages` to line 4.
+
+        const current = await getUserSettings(userId);
+        info(`Settings updated for ${userId}`);
+        res.json({ success: true, message: 'Ayarlar güncellendi', data: current });
+    } catch (e) {
+        error(`Settings update error: ${e.message}`);
+        res.status(400).json({ success: false, error: e.message });
+    }
+});
 
 // Get Settings
 router.get('/', async (req, res) => {
     try {
         const client = req.discordClient;
-        const userId = client.user.id;
+        const userId = req.userId; // client.user.id might be null if client not ready? Auth middleware sets req.userId.
+        // Prefer req.userId
 
         const settings = await getUserSettings(userId);
-        info(`Settings retrieved key for user: ${client.user.username}`);
+        info(`Settings retrieved for user: ${userId}`);
         res.json({ success: true, data: settings });
     } catch (e) {
         error(`Error retrieving settings: ${e.message}`);

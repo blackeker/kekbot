@@ -26,6 +26,7 @@ async function authMiddleware(req, res, next) {
       req.discordClient = client;
       req.userId = client.user.id;
       req.username = client.user.username;
+      req.apiKey = apiKey; // Add apiKey to request
     } else {
       // Bot aktif değilse, veritabanından kullanıcıyı doğrula
       const user = await getUserByApiKey(apiKey);
@@ -36,6 +37,7 @@ async function authMiddleware(req, res, next) {
       req.discordClient = null;
       req.userId = user.userId;
       req.username = user.username;
+      req.apiKey = apiKey; // Add apiKey to request
     }
 
     // Her şey yolundaysa, bir sonraki adıma geç
