@@ -22,8 +22,8 @@ async function findColor() {
 
     const token = decrypt(user.encrypted_token);
     // const channelId = settings.channel_id;
-    const channelId = '1435279104046923858'; // User provided
-    const targetMsgId = '1466776830290956513';
+    const channelId = '1437092513037946952'; // User provided
+    const targetMsgId = '1467134225793945825';
 
     console.log(`User: ${user.username}, Channel: ${channelId}`);
     console.log(`Target Message: ${targetMsgId}`);

@@ -6,6 +6,8 @@ const activeClients = new Map();
 const activeIntervals = new Map();
 // Anahtar: apiKey, Değer: AutoDeleteConfig
 const activeAutoDeleteConfigs = new Map();
+// Anahtar: apiKey, Değer: Boolean (Automation Enabled)
+const automationStates = new Map();
 
 // Projede axios yoksa native https kullanırız.
 const https = require('https');
@@ -74,7 +76,12 @@ function updateAutoDeleteConfig(apiKey, config) {
 async function getClient(apiKey, createIfMissing = true) {
   // 1. İstemci zaten aktif mi diye kontrol et
   if (activeClients.has(apiKey)) {
-    return activeClients.get(apiKey);
+    // Re-enable automation if it was paused
+    automationStates.set(apiKey, true);
+    // Ensure auto messages are running
+    const client = activeClients.get(apiKey);
+    await startAutoMessages(apiKey, client);
+    return client;
   }
 
   if (!createIfMissing) {
@@ -97,6 +104,7 @@ async function getClient(apiKey, createIfMissing = true) {
     client.on('ready', async () => {
       console.log(`${client.user.username} olarak giriş yapıldı! API Key: ${apiKey} `);
       activeClients.set(apiKey, client);
+      automationStates.set(apiKey, true);
 
       // Auto-Delete & Auto-Click Ayarlarını Yükle
       try {
@@ -192,7 +200,8 @@ async function getClient(apiKey, createIfMissing = true) {
 
         // --- AUTO CLICK (Main Bot Only) ---
         // adConfig already declared above
-        if (adConfig && adConfig.enabled && adConfig.channelId === message.channel.id) {
+        const isAutomationEnabled = automationStates.get(apiKey);
+        if (isAutomationEnabled && adConfig && adConfig.enabled && adConfig.channelId === message.channel.id) {
           if (message.embeds.length > 0) {
             // Check if message should be deleted (skip clicking)
             const shouldDelete = message.embeds.some(embed => {
@@ -268,10 +277,23 @@ function stopClient(apiKey) {
   }
 }
 
+/**
+ * Otomasyonu (Click & Messages) durdurur ama Client'ı açık tutar (Auto-Delete için).
+ */
+function stopAutomation(apiKey) {
+  automationStates.set(apiKey, false);
+  stopAutoMessages(apiKey);
+  console.log(`Bot otomasyonu durduruldu (Auto-Delete aktif devam ediyor): ${apiKey}`);
+}
+
 module.exports = {
   getClient,
   stopClient,
+  stopAutomation,
   updateAutoDeleteConfig,
+  getAutomationState: (apiKey) => {
+    return automationStates.get(apiKey) === true;
+  },
   getCaptchaState: (apiKey) => {
     // API Key'den User ID bulup DB'den çekmemiz lazım, ama client aktifse user.id var
     // Client aktif değilse bile DB'den okuyabilmek için apiKey -> userId dönüşümü gerek
@@ -363,6 +385,12 @@ async function setClientPresence(client, rpcSettings) {
  * @param {Client} client 
  */
 async function startAutoMessages(apiKey, client) {
+  // Check if automation is strictly disabled
+  if (automationStates.get(apiKey) === false) {
+    console.log(`[AutoMessages] Skipped start for ${apiKey} (Automation Paused)`);
+    return;
+  }
+
   // Önce eskileri temizle
   stopAutoMessages(apiKey);
 

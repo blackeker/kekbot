@@ -21,3 +21,5 @@ debug_db.js
 test_client.zip
 7w7web/
 serve_ui.py
+deploy_full.ps1
+push_to_github.ps1

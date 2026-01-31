@@ -5,7 +5,7 @@ const {
     updateUserCommand, patchUserCommand, deleteUserCommand,
     getUserSettings, getCommandStats
 } = require('../services/databaseService');
-const { stopClient, getCaptchaState, restartAutoMessages, getClient } = require('../services/botManager');
+const { stopClient, stopAutomation, getAutomationState, getCaptchaState, restartAutoMessages, getClient } = require('../services/botManager');
 const { stopAllSpamBotsForUser } = require('../services/spamService');
 const { info, error, getLogs } = require('../utils/logger');
 
@@ -64,6 +64,7 @@ router.get('/status', (req, res) => {
                 uptime: uptimeStr
             }
         },
+        automationEnabled: getAutomationState(req.headers.authorization || req.headers['x-api-key']),
         captchaState: getCaptchaState(req.headers.authorization || req.headers['x-api-key'])
     });
 });
@@ -74,7 +75,13 @@ router.post('/start', async (req, res) => {
     const apiKey = req.headers.authorization || req.headers['x-api-key'];
     // Eğer zaten çalışıyorsa
     if (req.discordClient) {
-        return res.json({ success: true, message: 'Bot zaten çalışıyor.' });
+        // Resume automation if it was paused
+        try {
+            await getClient(apiKey);
+            return res.json({ success: true, message: 'Bot zaten çalışıyor. (Otomasyon aktif edildi)' });
+        } catch (e) {
+            return res.json({ success: true, message: 'Bot zaten çalışıyor.' });
+        }
     }
 
     try {
@@ -94,10 +101,11 @@ router.post('/stop', (req, res) => {
         if (!req.discordClient) {
             return res.json({ success: true, message: 'Bot zaten kapalı.' });
         }
-        stopClient(apiKey);
-        stopAllSpamBotsForUser(req.userId); // Also stop all spam bots
-        info(`Bot and spam bots stopped: ${req.discordClient.user.username}`);
-        res.json({ success: true, message: 'Bot durduruldu.' });
+        stopAutomation(apiKey); // Stops click/messages, keeps client alive for Auto-Delete
+        stopAllSpamBotsForUser(req.userId); // Stops spam bots completely
+
+        info(`Bot automation paused (Auto-Delete active): ${req.discordClient.user.username}`);
+        res.json({ success: true, message: 'Bot otomasyonu durduruldu (Otomatik silme aktif).' });
     } catch (e) {
         error(`Error stopping bot: ${e.message}`);
         res.status(500).json({ success: false, error: 'Bot durdurulurken hata.' });
