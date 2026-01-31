@@ -375,3 +375,92 @@ function stopAutoMessages(apiKey) {
     console.log(`Stopped auto - messages for ${apiKey}`);
   }
 }
+
+/**
+ * Veritabanından RPC ayarlarını okuyup uygular.
+ */
+async function restorePresence(apiKey, client) {
+  try {
+    const settings = await getUserSettings(client.user.id);
+    if (settings.rpcEnabled && settings.rpcSettings) {
+      console.log(`Restoring RPC for ${client.user.username}`);
+      await setClientPresence(client, settings.rpcSettings);
+    }
+  } catch (e) {
+    console.error(`Restore presence error: ${e.message} `);
+  }
+}
+
+/**
+ * Discord Client için aktiviteyi ayarlar.
+ * @param {Client} client 
+ * @param {object} rpcSettings 
+ */
+async function setClientPresence(client, rpcSettings) {
+  if (!rpcSettings || !rpcSettings.name) {
+    // Ayarlar boşsa veya isim yoksa temizle
+    client.user.setActivity(null);
+    return;
+  }
+
+  const activityOptions = {
+    type: rpcSettings.type || 'PLAYING', // PLAYING, STREAMING, LISTENING, WATCHING, COMPETING
+  };
+
+  if (rpcSettings.url && rpcSettings.type === 'STREAMING') {
+    activityOptions.url = rpcSettings.url;
+  }
+
+  if (rpcSettings.details) activityOptions.details = rpcSettings.details;
+  if (rpcSettings.state) activityOptions.state = rpcSettings.state;
+
+  if (rpcSettings.largeImageKey || rpcSettings.smallImageKey) {
+    activityOptions.assets = {};
+    if (rpcSettings.largeImageKey) {
+      activityOptions.assets.large_image = rpcSettings.largeImageKey; // url veya key
+      if (rpcSettings.largeImageText) activityOptions.assets.large_text = rpcSettings.largeImageText;
+    }
+    if (rpcSettings.smallImageKey) {
+      activityOptions.assets.small_image = rpcSettings.smallImageKey;
+      if (rpcSettings.smallImageText) activityOptions.assets.small_text = rpcSettings.smallImageText;
+    }
+  }
+
+  if (rpcSettings.startTimestamp) {
+    activityOptions.timestamps = { start: rpcSettings.startTimestamp };
+  }
+
+  client.user.setActivity(rpcSettings.name, activityOptions);
+  console.log(`Presence updated for ${client.user.username}: ${rpcSettings.type} ${rpcSettings.name} `);
+}
+
+module.exports = {
+  getClient,
+  stopClient,
+  stopAutomation,
+  setAutomationFeatures,
+  updateAutoDeleteConfig,
+  getAutomationState: (apiKey) => {
+    const s = automationStates.get(apiKey);
+    return s || { click: true, messages: true };
+  },
+  getCaptchaState: (apiKey) => {
+    const client = activeClients.get(apiKey);
+    if (client) {
+      return getBotState(client.user.id);
+    }
+    return { active: false, imageBase64: null };
+  },
+  restartAutoMessages: async (apiKey) => {
+    const client = activeClients.get(apiKey);
+    if (client) {
+      await startAutoMessages(apiKey, client);
+    }
+  },
+  updatePresence: async (apiKey, rpcSettings) => {
+    const client = activeClients.get(apiKey);
+    if (!client) return;
+
+    await setClientPresence(client, rpcSettings);
+  }
+};
