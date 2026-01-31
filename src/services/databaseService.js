@@ -443,7 +443,7 @@ function getSpamBots(userId) {
 /**
  * Yeni spam bot ekler.
  */
-function addSpamBot(userId, token) {
+function addSpamBot(userId, token, config = {}) {
     if (!db) return;
     const stmt = db.prepare('INSERT INTO spam_bots (user_id, token, config) VALUES (?, ?, ?)');
     // Varsayılan config
@@ -451,7 +451,8 @@ function addSpamBot(userId, token) {
         channels: [],
         minDelay: 8000,
         maxDelay: 9000,
-        randomMessages: true
+        randomMessages: true,
+        ...config
     };
     stmt.run(userId, token, JSON.stringify(defaultConfig));
 }

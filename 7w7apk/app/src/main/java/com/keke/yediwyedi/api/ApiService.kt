@@ -44,10 +44,16 @@ interface ApiService {
     suspend fun getCommands(): Response<ApiResponse<List<Command>>>
 
     @POST("commands/add")
+    @JvmSuppressWildcards
     suspend fun addCommand(@Body body: Map<String, Command>): Response<ApiResponse<List<Command>>>
 
     @POST("commands")
     suspend fun saveCommands(@Body body: Map<String, List<Command>>): Response<ApiResponse<List<Command>>>
+
+
+    @PUT("commands/{index}")
+    @JvmSuppressWildcards
+    suspend fun updateCommand(@Path("index") index: Int, @Body body: Map<String, Command>): Response<ApiResponse<List<Command>>>
 
     @DELETE("commands/{index}")
     suspend fun deleteCommand(@Path("index") index: Int): Response<ApiResponse<List<Command>>>
@@ -57,7 +63,8 @@ interface ApiService {
     suspend fun getSpamBots(): Response<ApiResponse<List<SpamBot>>>
 
     @POST("spam")
-    suspend fun addSpamBot(@Body body: Map<String, String>): Response<ApiResponse<Any>> // body: { token: ... }
+    @JvmSuppressWildcards
+    suspend fun addSpamBot(@Body body: Map<String, Any>): Response<ApiResponse<Any>> // body: { token: ..., config: {...} }
 
     @DELETE("spam/{id}")
     suspend fun deleteSpamBot(@Path("id") id: Int): Response<ApiResponse<Any>>

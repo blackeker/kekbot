@@ -87,21 +87,36 @@ fun SpamArmyScreen(navController: NavController) {
 
     if (showAddDialog) {
         var token by remember { mutableStateOf("") }
+        var channelId by remember { mutableStateOf("") }
+        
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
             title = { Text("Spam Bot Ekle") },
             text = {
-                 OutlinedTextField(
-                     value = token,
-                     onValueChange = { token = it },
-                     label = { Text("Discord Tokeni") },
-                     modifier = Modifier.fillMaxWidth()
-                 )
+                 Column {
+                     OutlinedTextField(
+                         value = token,
+                         onValueChange = { token = it },
+                         label = { Text("Discord Tokeni") },
+                         modifier = Modifier.fillMaxWidth()
+                     )
+                     Spacer(modifier = Modifier.height(8.dp))
+                     OutlinedTextField(
+                         value = channelId,
+                         onValueChange = { channelId = it },
+                         label = { Text("Hedef Kanal ID (İsteğe Bağlı)") },
+                         placeholder = { Text("Boş ise varsayılan yok") },
+                         modifier = Modifier.fillMaxWidth()
+                     )
+                 }
             },
             confirmButton = {
                 Button(onClick = {
                     scope.launch {
-                        RetrofitClient.getService().addSpamBot(mapOf("token" to token))
+                        val config = if(channelId.isNotBlank()) mapOf("channels" to listOf(channelId)) else emptyMap()
+                        val body = mapOf("token" to token, "config" to config)
+                        
+                        RetrofitClient.getService().addSpamBot(body)
                         showAddDialog = false
                         refresh()
                         snackbarHostState.showSnackbar("Bot Eklendi")
@@ -158,10 +173,11 @@ fun SpamBotItem(bot: SpamBot, onRefresh: () -> Unit) {
     val isRunning = bot.is_active == 1
     
     Card(
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (isRunning) Color(0xFFE6FFEA) else ListItemDefaults.containerColor
+            containerColor = Color(0xFF1E1E1E)
         ),
-        elevation = CardDefaults.cardElevation(2.dp)
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isRunning) Color(0xFF00C853) else Color.Red)
     ) {
         Row(
             modifier = Modifier.padding(16.dp).fillMaxWidth(),
@@ -169,15 +185,17 @@ fun SpamBotItem(bot: SpamBot, onRefresh: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("Bot #${bot.id}", fontWeight = FontWeight.Bold)
+                Text("Bot #${bot.id}", fontWeight = FontWeight.Bold, color = Color.White)
                 Text(
-                    text = if(isRunning) "ÇALIŞIYOR" else "DURDU",
-                    color = if(isRunning) Color(0xFF00C853) else Color.Gray,
-                    style = MaterialTheme.typography.bodySmall
+                    text = if(isRunning) "DURUM: ÇALIŞIYOR" else "DURUM: DURDU",
+                    color = if(isRunning) Color(0xFF00C853) else Color.Red,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 // Mask Token
                 Text(
-                    text = bot.token.take(10) + "...",
+                    text = "Token: " + bot.token.take(10) + "...",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray
                 )
@@ -203,7 +221,7 @@ fun SpamBotItem(bot: SpamBot, onRefresh: () -> Unit) {
                          onRefresh()
                     }
                 }) {
-                    Icon(Icons.Default.Delete, "Sil")
+                    Icon(Icons.Default.Delete, "Sil", tint = Color.Gray)
                 }
             }
         }

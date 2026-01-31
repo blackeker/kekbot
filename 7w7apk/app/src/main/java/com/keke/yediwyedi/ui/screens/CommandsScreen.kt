@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,6 +45,9 @@ fun CommandsScreen(navController: NavController) {
         }
     }
 
+    var showUpdateDialog by remember { mutableStateOf<Command?>(null) }
+    var updateIndex by remember { mutableStateOf(-1) }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -74,9 +78,13 @@ fun CommandsScreen(navController: NavController) {
                     itemsIndexed(commands) { index, cmd ->
                         CommandItem(
                             command = cmd,
+                            onEdit = { 
+                                updateIndex = index
+                                showUpdateDialog = cmd 
+                            },
                             onDelete = {
                                 scope.launch {
-                                    val res = RetrofitClient.getService().deleteCommand(index) // API expects index
+                                    val res = RetrofitClient.getService().deleteCommand(index)
                                     if (res.isSuccessful) {
                                         commands = res.body()?.data ?: emptyList()
                                         snackbarHostState.showSnackbar("Komut silindi")
@@ -91,7 +99,10 @@ fun CommandsScreen(navController: NavController) {
     }
 
     if (showAddDialog) {
-        AddCommandDialog(
+        CommandDialog(
+            title = "Yeni Komut",
+            initialText = "",
+            initialInterval = "0",
             onDismiss = { showAddDialog = false },
             onConfirm = { cmd ->
                 scope.launch {
@@ -106,13 +117,34 @@ fun CommandsScreen(navController: NavController) {
             }
         )
     }
+    
+    if (showUpdateDialog != null) {
+        CommandDialog(
+            title = "Komut Düzenle",
+            initialText = showUpdateDialog!!.text,
+            initialInterval = showUpdateDialog!!.interval?.toString() ?: "0",
+            onDismiss = { showUpdateDialog = null },
+            onConfirm = { cmd ->
+                scope.launch {
+                    val map = mapOf("command" to cmd)
+                    val res = RetrofitClient.getService().updateCommand(updateIndex, map)
+                    if (res.isSuccessful) {
+                        commands = res.body()?.data ?: emptyList()
+                        showUpdateDialog = null
+                        snackbarHostState.showSnackbar("Komut güncellendi")
+                    }
+                }
+            }
+        )
+    }
 }
 
 @Composable
-fun CommandItem(command: Command, onDelete: () -> Unit) {
+fun CommandItem(command: Command, onEdit: () -> Unit, onDelete: () -> Unit) {
     Card(
+        modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(4.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)) // Dark
     ) {
         Row(
             modifier = Modifier
@@ -124,31 +156,50 @@ fun CommandItem(command: Command, onDelete: () -> Unit) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = command.text ?: "Metin Yok", 
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White
                 )
-                if ((command.interval ?: 0) > 0) {
+                val interval = command.interval ?: 0
+                if (interval > 0) {
                     Text(
-                        text = "Tekrar: ${command.interval}ms",
+                        text = "Tekrar: ${interval}ms",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF00C853)
+                    )
+                } else {
+                     Text(
+                        text = "Tekrar: Yok",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Gray
                     )
                 }
             }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, "Sil", tint = Color.Red)
+            Row {
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Default.Edit, "Düzenle", tint = Color.Cyan)
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, "Sil", tint = Color.Red)
+                }
             }
         }
     }
 }
 
 @Composable
-fun AddCommandDialog(onDismiss: () -> Unit, onConfirm: (Command) -> Unit) {
-    var text by remember { mutableStateOf("") }
-    var intervalStr by remember { mutableStateOf("0") }
+fun CommandDialog(
+    title: String, 
+    initialText: String, 
+    initialInterval: String, 
+    onDismiss: () -> Unit, 
+    onConfirm: (Command) -> Unit
+) {
+    var text by remember { mutableStateOf(initialText) }
+    var intervalStr by remember { mutableStateOf(initialInterval) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Yeni Komut") },
+        title = { Text(title) },
         text = {
             Column {
                 OutlinedTextField(
@@ -173,7 +224,7 @@ fun AddCommandDialog(onDismiss: () -> Unit, onConfirm: (Command) -> Unit) {
                     onConfirm(Command(text = text, interval = interval, type = "text"))
                 }
             }) {
-                Text("Ekle")
+                Text("Kaydet")
             }
         },
         dismissButton = {

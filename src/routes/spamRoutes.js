@@ -19,10 +19,10 @@ router.get('/', (req, res) => {
 // Add new spam bot
 router.post('/', (req, res) => {
     try {
-        const { token } = req.body;
+        const { token, config } = req.body;
         if (!token) return res.status(400).json({ success: false, error: 'Token is required' });
 
-        addSpamBot(req.userId, token);
+        addSpamBot(req.userId, token, config);
         res.json({ success: true, message: 'Bot added' });
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
