@@ -35,10 +35,10 @@ fun SpamArmyScreen(navController: NavController) {
                 if (res.isSuccessful) {
                     bots = res.body()?.data ?: emptyList()
                 } else {
-                    snackbarHostState.showSnackbar("Failed to refresh: ${res.message()}")
+                    snackbarHostState.showSnackbar("Yenileme başarısız: ${res.message()}")
                 }
             } catch (e: Exception) {
-                snackbarHostState.showSnackbar("Error: ${e.message}")
+                snackbarHostState.showSnackbar("Hata: ${e.message}")
             } finally {
                 isLoading = false
             }
@@ -51,22 +51,22 @@ fun SpamArmyScreen(navController: NavController) {
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Spam Army (${bots.size})") },
+                title = { Text("Spam Ordusu (${bots.size})") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, "Back")
+                        Icon(Icons.Default.ArrowBack, "Geri")
                     }
                 },
                 actions = {
                     IconButton(onClick = { showPotatoDialog = true }) {
-                        Icon(Icons.Default.Agriculture, "Potato Attack") // Using agriculture as potato icon equivalent
+                        Icon(Icons.Default.Agriculture, "Patates Saldırısı") 
                     }
                 }
             )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Default.Add, "Add Bot")
+                Icon(Icons.Default.Add, "Bot Ekle")
             }
         }
     ) { padding ->
@@ -89,12 +89,12 @@ fun SpamArmyScreen(navController: NavController) {
         var token by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
-            title = { Text("Add Spam Bot") },
+            title = { Text("Spam Bot Ekle") },
             text = {
                  OutlinedTextField(
                      value = token,
                      onValueChange = { token = it },
-                     label = { Text("Discord Token") },
+                     label = { Text("Discord Tokeni") },
                      modifier = Modifier.fillMaxWidth()
                  )
             },
@@ -104,10 +104,11 @@ fun SpamArmyScreen(navController: NavController) {
                         RetrofitClient.getService().addSpamBot(mapOf("token" to token))
                         showAddDialog = false
                         refresh()
+                        snackbarHostState.showSnackbar("Bot Eklendi")
                     }
-                }) { Text("Add") }
+                }) { Text("Ekle") }
             },
-            dismissButton = { TextButton(onClick = { showAddDialog = false }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { showAddDialog = false }) { Text("İptal") } }
         )
     }
 
@@ -117,15 +118,15 @@ fun SpamArmyScreen(navController: NavController) {
         
         AlertDialog(
             onDismissRequest = { showPotatoDialog = false },
-            title = { Text("🥔 Potato Attack") },
+            title = { Text("🥔 Patates Saldırısı") },
             text = {
                 Column {
-                    Text("Enter Target User ID to spam with potatoes.")
+                    Text("Patates yağmuru için hedef Kullanıcı ID'si girin.")
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = target,
                         onValueChange = { target = it },
-                        label = { Text("Target User ID") },
+                        label = { Text("Hedef Kullanıcı ID") },
                         modifier = Modifier.fillMaxWidth()
                     )
                     if (resultMsg != null) {
@@ -139,14 +140,14 @@ fun SpamArmyScreen(navController: NavController) {
                     scope.launch {
                         try {
                             val res = RetrofitClient.getService().sendPotato(mapOf("targetUserId" to target))
-                            resultMsg = res.body()?.message ?: "Completed"
+                            resultMsg = res.body()?.message ?: "Tamamlandı"
                         } catch(e: Exception) {
-                            resultMsg = "Error: ${e.message}"
+                            resultMsg = "Hata: ${e.message}"
                         }
                     }
-                }) { Text("ATTACK") }
+                }) { Text("SALDIR") }
             },
-            dismissButton = { TextButton(onClick = { showPotatoDialog = false }) { Text("Close") } }
+            dismissButton = { TextButton(onClick = { showPotatoDialog = false }) { Text("Kapat") } }
         )
     }
 }
@@ -170,7 +171,7 @@ fun SpamBotItem(bot: SpamBot, onRefresh: () -> Unit) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("Bot #${bot.id}", fontWeight = FontWeight.Bold)
                 Text(
-                    text = if(isRunning) "RUNNING" else "STOPPED",
+                    text = if(isRunning) "ÇALIŞIYOR" else "DURDU",
                     color = if(isRunning) Color(0xFF00C853) else Color.Gray,
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -202,7 +203,7 @@ fun SpamBotItem(bot: SpamBot, onRefresh: () -> Unit) {
                          onRefresh()
                     }
                 }) {
-                    Icon(Icons.Default.Delete, "Delete")
+                    Icon(Icons.Default.Delete, "Sil")
                 }
             }
         }

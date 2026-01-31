@@ -73,12 +73,12 @@ fun SettingsScreen(navController: NavController) {
                 
                 val res = RetrofitClient.getService().updateSettings(settings)
                 if (res.isSuccessful) {
-                    snackbarHostState.showSnackbar("Settings Saved Successfully")
+                    snackbarHostState.showSnackbar("Ayarlar Başarıyla Kaydedildi")
                 } else {
-                    snackbarHostState.showSnackbar("Error: ${res.message()}")
+                    snackbarHostState.showSnackbar("Hata: ${res.message()}")
                 }
             } catch (e: Exception) {
-                snackbarHostState.showSnackbar("Connection Error: ${e.message}")
+                snackbarHostState.showSnackbar("Bağlantı Hatası: ${e.message}")
             } finally {
                 isLoading = false
             }
@@ -89,15 +89,15 @@ fun SettingsScreen(navController: NavController) {
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = { Text("Ayarlar") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, "Back")
+                        Icon(Icons.Default.ArrowBack, "Geri")
                     }
                 },
                 actions = {
                     IconButton(onClick = { save() }) {
-                        Icon(Icons.Default.Save, "Save")
+                        Icon(Icons.Default.Save, "Kaydet")
                     }
                 }
             )
@@ -113,11 +113,11 @@ fun SettingsScreen(navController: NavController) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("General", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            Text("Genel", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
             OutlinedTextField(
                 value = channelId,
                 onValueChange = { channelId = it },
-                label = { Text("Main Channel ID") },
+                label = { Text("Ana Kanal ID") },
                 modifier = Modifier.fillMaxWidth()
             )
             
@@ -127,43 +127,43 @@ fun SettingsScreen(navController: NavController) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Switch(checked = rpcEnabled, onCheckedChange = { rpcEnabled = it })
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Enable RPC")
+                Text("RPC Aktif Et")
             }
             if (rpcEnabled) {
                 OutlinedTextField(
                     value = rpcTitle,
                     onValueChange = { rpcTitle = it },
-                    label = { Text("Title (Playing...)") },
+                    label = { Text("Başlık (Oynuyor...)") },
                     modifier = Modifier.fillMaxWidth()
                 )
                  OutlinedTextField(
                     value = rpcDetails,
                     onValueChange = { rpcDetails = it },
-                    label = { Text("Details") },
+                    label = { Text("Detaylar") },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
             
             Divider()
             
-            Text("Auto Delete", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            Text("Otomatik Silme", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
              Row(verticalAlignment = Alignment.CenterVertically) {
                 Switch(checked = autoDeleteEnabled, onCheckedChange = { autoDeleteEnabled = it })
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Enable Auto Delete")
+                Text("Otomatik Silme Aktif")
             }
              if (autoDeleteEnabled) {
                 OutlinedTextField(
                     value = autoDeleteChannelId,
                     onValueChange = { autoDeleteChannelId = it },
-                    label = { Text("Target Channel ID") },
+                    label = { Text("Hedef Kanal ID") },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
             
             Spacer(modifier = Modifier.height(32.dp))
             Button(onClick = { save() }, modifier = Modifier.fillMaxWidth()) {
-                Text("SAVE ALL SETTINGS")
+                Text("TÜMÜNÜ KAYDET")
             }
         }
     }

@@ -15,7 +15,7 @@ interface ApiService {
 
     // --- Bot Control ---
     @GET("bot/status")
-    suspend fun getBotStatus(): Response<ApiResponse<StatusResponse>>
+    suspend fun getBotStatus(): Response<StatusResponse>
 
     @POST("bot/start")
     suspend fun startBot(): Response<ApiResponse<Any>>

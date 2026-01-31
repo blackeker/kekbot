@@ -38,7 +38,7 @@ fun CommandsScreen(navController: NavController) {
                 commands = res.body()?.data ?: emptyList()
             }
         } catch (e: Exception) {
-            snackbarHostState.showSnackbar("Failed to load commands")
+            snackbarHostState.showSnackbar("Komutlar yüklenemedi")
         } finally {
             isLoading = false
         }
@@ -48,17 +48,17 @@ fun CommandsScreen(navController: NavController) {
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Custom Commands") },
+                title = { Text("Özel Komutlar") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, "Back")
+                        Icon(Icons.Default.ArrowBack, "Geri")
                     }
                 }
             )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Default.Add, "Add Command")
+                Icon(Icons.Default.Add, "Komut Ekle")
             }
         }
     ) { padding ->
@@ -79,6 +79,7 @@ fun CommandsScreen(navController: NavController) {
                                     val res = RetrofitClient.getService().deleteCommand(index) // API expects index
                                     if (res.isSuccessful) {
                                         commands = res.body()?.data ?: emptyList()
+                                        snackbarHostState.showSnackbar("Komut silindi")
                                     }
                                 }
                             }
@@ -99,6 +100,7 @@ fun CommandsScreen(navController: NavController) {
                     if (res.isSuccessful) {
                         commands = res.body()?.data ?: emptyList()
                         showAddDialog = false
+                        snackbarHostState.showSnackbar("Komut eklendi")
                     }
                 }
             }
@@ -121,19 +123,19 @@ fun CommandItem(command: Command, onDelete: () -> Unit) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = command.text ?: "No Text", // Or response? API ambiguity.
+                    text = command.text ?: "Metin Yok", 
                     style = MaterialTheme.typography.bodyLarge
                 )
                 if ((command.interval ?: 0) > 0) {
                     Text(
-                        text = "Interval: ${command.interval}ms",
+                        text = "Tekrar: ${command.interval}ms",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Gray
                     )
                 }
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, "Delete", tint = Color.Red)
+                Icon(Icons.Default.Delete, "Sil", tint = Color.Red)
             }
         }
     }
@@ -146,20 +148,20 @@ fun AddCommandDialog(onDismiss: () -> Unit, onConfirm: (Command) -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("New Command") },
+        title = { Text("Yeni Komut") },
         text = {
             Column {
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
-                    label = { Text("Message Text") },
+                    label = { Text("Mesaj Metni") },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = intervalStr,
                     onValueChange = { if (it.all { c -> c.isDigit() }) intervalStr = it },
-                    label = { Text("Interval (ms, 0 to disable)") },
+                    label = { Text("Tekrar Süresi (ms, 0 kapalı)") },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -171,11 +173,11 @@ fun AddCommandDialog(onDismiss: () -> Unit, onConfirm: (Command) -> Unit) {
                     onConfirm(Command(text = text, interval = interval, type = "text"))
                 }
             }) {
-                Text("Add")
+                Text("Ekle")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text("İptal") }
         }
     )
 }

@@ -25,13 +25,13 @@ fun LoginScreen(onLoginSuccess: () -> Unit, prefs: UserPreferences) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("7W7 Bot Control", style = MaterialTheme.typography.headlineMedium)
+        Text("7W7 Bot Kontrol", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(32.dp))
 
         OutlinedTextField(
             value = url,
             onValueChange = { url = it },
-            label = { Text("API URL") },
+            label = { Text("API Adresi (URL)") },
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(16.dp))
@@ -39,7 +39,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit, prefs: UserPreferences) {
         OutlinedTextField(
             value = apiKey,
             onValueChange = { apiKey = it },
-            label = { Text("API Key") },
+            label = { Text("API Anahtarı (Token)") },
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(24.dp))
@@ -61,10 +61,10 @@ fun LoginScreen(onLoginSuccess: () -> Unit, prefs: UserPreferences) {
                                 prefs.saveConfig(url, apiKey)
                                 onLoginSuccess()
                             } else {
-                                errorMsg = "Login Failed: ${response.code()} ${response.message()}"
+                                errorMsg = "Giriş Başarısız: ${response.code()} ${response.message()}"
                             }
                         } catch (e: Exception) {
-                            errorMsg = "Connection Error: ${e.message}"
+                            errorMsg = "Bağlantı Hatası: ${e.message}"
                         } finally {
                             isLoading = false
                         }
@@ -72,7 +72,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit, prefs: UserPreferences) {
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Connect")
+                Text("Bağlan")
             }
         }
 

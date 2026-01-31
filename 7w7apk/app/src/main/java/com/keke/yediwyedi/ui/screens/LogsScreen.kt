@@ -45,15 +45,15 @@ fun LogsScreen(navController: NavController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Console Logs") },
+                title = { Text("Konsol Logları") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, "Back")
+                        Icon(Icons.Default.ArrowBack, "Geri")
                     }
                 },
                 actions = {
                     IconButton(onClick = { refresh() }) {
-                        Icon(Icons.Default.Refresh, "Refresh")
+                        Icon(Icons.Default.Refresh, "Yenile")
                     }
                 }
             )
@@ -64,13 +64,8 @@ fun LogsScreen(navController: NavController) {
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(8.dp),
-                reverseLayout = true // Show newest at bottom usually logs, but API returns list? 
-                // IF API returns [old...new], we want to see new.
-                // Reversing or scrolling to bottom.
-                // Let's assume standard order.
+                reverseLayout = true 
             ) {
-                // If logs is big, this might be heavy.
-                // We'll just list them.
                 items(logs.reversed()) { log ->
                      Text(
                         text = log,

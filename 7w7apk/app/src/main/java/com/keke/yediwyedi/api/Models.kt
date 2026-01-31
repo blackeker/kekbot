@@ -32,6 +32,8 @@ data class BotStats(
 )
 
 data class StatusResponse(
+    val success: Boolean,
+    val message: String?,
     val data: BotStatusData?,
     val automationEnabled: Boolean,
     val automationState: AutomationState?,
