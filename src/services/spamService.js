@@ -2,7 +2,6 @@ const { Client } = require('discord.js-selfbot-v13');
 const Database = require('better-sqlite3');
 const path = require('path');
 const { getSpamBots, updateSpamBotStatus, incrementCommandUsage, getBotState } = require('./databaseService');
-const { attachAutoDeleteToSpamBot } = require('./autoDeleteService');
 
 // Map<botId, Client>
 const activeSpamClients = new Map();
