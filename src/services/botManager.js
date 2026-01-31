@@ -7,6 +7,7 @@ const activeIntervals = new Map();
 // Anahtar: apiKey, Değer: AutoDeleteConfig
 const activeAutoDeleteConfigs = new Map();
 // Anahtar: apiKey, Değer: Boolean (Automation Enabled)
+// Anahtar: apiKey, Değer: { click: boolean, messages: boolean }
 const automationStates = new Map();
 
 // Projede axios yoksa native https kullanırız.
@@ -28,15 +29,10 @@ function downloadImageToBase64(url) {
   });
 }
 
-
-/**
- * Safe button click implementation that awaits the API request
- * to prevent unhandled promise rejections on API errors (e.g. 400 Bad Request)
- */
 async function clickButtonSafe(client, message, button) {
   const nonce = SnowflakeUtil.generate();
   const data = {
-    type: 3, // MESSAGE_COMPONENT
+    type: 3,
     nonce,
     guild_id: message.guildId,
     channel_id: message.channelId,
@@ -55,9 +51,6 @@ async function clickButtonSafe(client, message, button) {
   });
 }
 
-/**
- * Auto-delete configini gunceller (Runtime)
- */
 function updateAutoDeleteConfig(apiKey, config) {
   if (activeClients.has(apiKey)) {
     activeAutoDeleteConfigs.set(apiKey, config);
@@ -66,9 +59,6 @@ function updateAutoDeleteConfig(apiKey, config) {
 }
 
 /**
- * Verilen API anahtarı için bir Discord istemcisi döndürür.
- * İstemci zaten aktifse, mevcut olanı döndürür.
- * Değilse, yeni bir tane oluşturur, giriş yapar ve saklar.
  * @param {string} apiKey Kullanıcının API anahtarı.
  * @param {boolean} createIfMissing İstemci yoksa oluşturulsun mu? (Varsayılan: true)
  * @returns {Promise<Client|null>} Kullanıcıya ait Discord istemci nesnesi veya null.
@@ -76,8 +66,8 @@ function updateAutoDeleteConfig(apiKey, config) {
 async function getClient(apiKey, createIfMissing = true) {
   // 1. İstemci zaten aktif mi diye kontrol et
   if (activeClients.has(apiKey)) {
-    // Re-enable automation if it was paused
-    automationStates.set(apiKey, true);
+    // Re-enable automation if it was paused (Resume all)
+    automationStates.set(apiKey, { click: true, messages: true });
     // Ensure auto messages are running
     const client = activeClients.get(apiKey);
     await startAutoMessages(apiKey, client);
@@ -86,6 +76,39 @@ async function getClient(apiKey, createIfMissing = true) {
 
   if (!createIfMissing) {
     return null;
+  }
+
+  // ... (lines 91-106)
+  activeClients.set(apiKey, client);
+  automationStates.set(apiKey, { click: true, messages: true });
+
+  // ... 
+
+  /**
+   * Otomasyonu (Click: false, Messages: false) durdurur ama Client'ı açık tutar (Auto-Delete için).
+   */
+  function stopAutomation(apiKey) {
+    automationStates.set(apiKey, { click: false, messages: false });
+    // stopAutoMessages(apiKey); // StartAutoMessages loop check handles this now, but let's clear intervals to be safe/efficient
+    stopAutoMessages(apiKey);
+    console.log(`Bot otomasyonu durduruldu (Auto-Delete aktif devam ediyor): ${apiKey}`);
+  }
+
+  function setAutomationFeatures(apiKey, features) {
+    const current = automationStates.get(apiKey) || { click: false, messages: false };
+    const newState = { ...current, ...features };
+    automationStates.set(apiKey, newState);
+    const client = activeClients.get(apiKey);
+    if (client) {
+      if (newState.messages) {
+        startAutoMessages(apiKey, client);
+      } else {
+        stopAutoMessages(apiKey);
+      }
+    }
+
+    console.log(`Automation features updated for ${apiKey}: `, newState);
+    return newState;
   }
 
   // 2. İstemci aktif değilse, veritabanından kullanıcıyı al
@@ -200,8 +223,10 @@ async function getClient(apiKey, createIfMissing = true) {
 
         // --- AUTO CLICK (Main Bot Only) ---
         // adConfig already declared above
-        const isAutomationEnabled = automationStates.get(apiKey);
-        if (isAutomationEnabled && adConfig && adConfig.enabled && adConfig.channelId === message.channel.id) {
+        const autoState = automationStates.get(apiKey);
+        const isClickEnabled = autoState && autoState.click !== false; // Default true if not set false
+
+        if (isClickEnabled && adConfig && adConfig.enabled && adConfig.channelId === message.channel.id) {
           if (message.embeds.length > 0) {
             // Check if message should be deleted (skip clicking)
             const shouldDelete = message.embeds.some(embed => {
@@ -261,133 +286,14 @@ async function getClient(apiKey, createIfMissing = true) {
   });
 }
 
-/**
- * Bir istemciyi durdurur ve aktif listeden kaldırır.
- * (Örn: Kullanıcı hesabını sildiğinde kullanılabilir)
- * @param {string} apiKey Durdurulacak istemcinin API anahtarı.
- */
-function stopClient(apiKey) {
-  if (activeClients.has(apiKey)) {
-    const client = activeClients.get(apiKey);
-    client.destroy();
-    activeClients.delete(apiKey);
-    activeAutoDeleteConfigs.delete(apiKey);
-    stopAutoMessages(apiKey);
-    console.log(`İstemci durduruldu ve listeden kaldırıldı: ${apiKey} `);
-  }
-}
+// ... existing stopClient, stopAutomation ...
 
-/**
- * Otomasyonu (Click & Messages) durdurur ama Client'ı açık tutar (Auto-Delete için).
- */
-function stopAutomation(apiKey) {
-  automationStates.set(apiKey, false);
-  stopAutoMessages(apiKey);
-  console.log(`Bot otomasyonu durduruldu (Auto-Delete aktif devam ediyor): ${apiKey}`);
-}
-
-module.exports = {
-  getClient,
-  stopClient,
-  stopAutomation,
-  updateAutoDeleteConfig,
-  getAutomationState: (apiKey) => {
-    return automationStates.get(apiKey) === true;
-  },
-  getCaptchaState: (apiKey) => {
-    // API Key'den User ID bulup DB'den çekmemiz lazım, ama client aktifse user.id var
-    // Client aktif değilse bile DB'den okuyabilmek için apiKey -> userId dönüşümü gerek
-    const client = activeClients.get(apiKey);
-    if (client) {
-      return getBotState(client.user.id);
-    }
-    return { active: false, imageBase64: null }; // Client yoksa varsayılan dön
-  },
-  restartAutoMessages: async (apiKey) => {
-    const client = activeClients.get(apiKey);
-    if (client) {
-      await startAutoMessages(apiKey, client);
-    }
-  },
-  updatePresence: async (apiKey, rpcSettings) => {
-    const client = activeClients.get(apiKey);
-    if (!client) return; // Client yoksa işlem yapma (veya hata fırlatılabilir)
-
-    await setClientPresence(client, rpcSettings);
-  }
-};
-
-/**
- * Veritabanından RPC ayarlarını okuyup uygular.
- */
-async function restorePresence(apiKey, client) {
-  try {
-    const settings = await getUserSettings(client.user.id);
-    if (settings.rpcEnabled && settings.rpcSettings) {
-      console.log(`Restoring RPC for ${client.user.username}`);
-      await setClientPresence(client, settings.rpcSettings);
-    }
-  } catch (e) {
-    console.error(`Restore presence error: ${e.message} `);
-  }
-}
-
-/**
- * Discord Client için aktiviteyi ayarlar.
- * @param {Client} client 
- * @param {object} rpcSettings 
- */
-async function setClientPresence(client, rpcSettings) {
-  if (!rpcSettings || !rpcSettings.name) {
-    // Ayarlar boşsa veya isim yoksa temizle
-    client.user.setActivity(null);
-    return;
-  }
-
-  const activityOptions = {
-    type: rpcSettings.type || 'PLAYING', // PLAYING, STREAMING, LISTENING, WATCHING, COMPETING
-  };
-
-  if (rpcSettings.url && rpcSettings.type === 'STREAMING') {
-    activityOptions.url = rpcSettings.url;
-  }
-
-  // Rich Presence detayları (Bazı client'lar destekler)
-  // Selfbot'ta bazen sadece type ve name çalışır, ama deneyelim.
-  // Selfbot v13'te RichPresence genellikle "RichPresence" class'ı ile veya setActivity options ile yapılır.
-
-  if (rpcSettings.details) activityOptions.details = rpcSettings.details;
-  if (rpcSettings.state) activityOptions.state = rpcSettings.state;
-
-  if (rpcSettings.largeImageKey || rpcSettings.smallImageKey) {
-    activityOptions.assets = {};
-    if (rpcSettings.largeImageKey) {
-      activityOptions.assets.large_image = rpcSettings.largeImageKey; // url veya key
-      if (rpcSettings.largeImageText) activityOptions.assets.large_text = rpcSettings.largeImageText;
-    }
-    if (rpcSettings.smallImageKey) {
-      activityOptions.assets.small_image = rpcSettings.smallImageKey;
-      if (rpcSettings.smallImageText) activityOptions.assets.small_text = rpcSettings.smallImageText;
-    }
-  }
-
-  if (rpcSettings.startTimestamp) {
-    activityOptions.timestamps = { start: rpcSettings.startTimestamp };
-  }
-
-  client.user.setActivity(rpcSettings.name, activityOptions);
-  console.log(`Presence updated for ${client.user.username}: ${rpcSettings.type} ${rpcSettings.name} `);
-}
-
-/**
- * Kullanıcı için otomatik mesaj zamanlayıcılarını başlatır.
- * @param {string} apiKey 
- * @param {Client} client 
- */
+// THIS PART RESTORES THE DAMAGED startAutoMessages FUNCTION
 async function startAutoMessages(apiKey, client) {
-  // Check if automation is strictly disabled
-  if (automationStates.get(apiKey) === false) {
-    console.log(`[AutoMessages] Skipped start for ${apiKey} (Automation Paused)`);
+  // Check if automation is strictly disabled (or messages specifically)
+  const state = automationStates.get(apiKey);
+  if (state && state.messages === false) {
+    console.log(`[AutoMessages] Skipped start for ${apiKey} (Messages Paused)`);
     return;
   }
 
@@ -408,16 +314,18 @@ async function startAutoMessages(apiKey, client) {
       const intervalMs = parseInt(cmd.interval);
       if (!isNaN(intervalMs) && intervalMs > 0) {
         const timer = setInterval(async () => {
-          if (automationStates.get(apiKey) === false) {
+          // --- AUTOMATION STATE CHECK ---
+          const loopState = automationStates.get(apiKey);
+          if (loopState && loopState.messages === false) {
             return;
           }
 
+          // --- CAPTCHA CHECK ---
           const currentClient = activeClients.get(apiKey);
           if (!currentClient || !currentClient.user) return;
 
           const cap = getBotState(currentClient.user.id);
           if (cap && cap.active) {
-            // console.log(`[Auto] Paused due to Captcha: ${cmd.trigger}`);
             return;
           }
           // ---------------------
@@ -434,11 +342,7 @@ async function startAutoMessages(apiKey, client) {
             // Auto-Recovery for Zombie Token
             if (err.message.includes('token was unavailable')) {
               console.log(`♻️ Zombie token detected for ${apiKey}. Restarting client in 2s...`);
-
-              // Stop everything first
               stopClient(apiKey);
-
-              // Restart after short delay
               setTimeout(async () => {
                 try {
                   console.log(`♻️ Reconnecting ${apiKey}...`);
