@@ -381,7 +381,6 @@ function stopAutoMessages(apiKey) {
   if (activeIntervals.has(apiKey)) {
     activeIntervals.get(apiKey).forEach(clearInterval);
     activeIntervals.delete(apiKey);
-    console.log(`Stopped auto - messages for ${apiKey}`);
   }
 }
 
